@@ -63,8 +63,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const { data: session, status } = useSession();
 
+  const isAuthPage = pathname === '/login' || pathname === '/logout';
+
   if (status === 'loading') return null;
-  if (!session) return <div>{children}</div>;
+  if (!session || isAuthPage) return <div>{children}</div>;
 
   return (
     <div className="min-h-screen bg-muted/40">
