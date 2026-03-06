@@ -1,13 +1,11 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/lib/db";
 import { adminUsers } from "@/lib/schema";
 import bcrypt from "bcrypt";
 import { eq } from "drizzle-orm";
 
 export const authOptions: NextAuthOptions = {
-  adapter: DrizzleAdapter(db),
   secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",

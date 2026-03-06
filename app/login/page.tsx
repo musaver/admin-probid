@@ -31,24 +31,7 @@ export default function LoginPage() {
     setLoading(false);
 
     if (res?.error) {
-      try {
-        const parsed = JSON.parse(res.error);
-        switch (parsed.code) {
-          case "MISSING_CREDENTIALS":
-            setErrorMsg("Please enter both email and password.");
-            break;
-          case "USER_NOT_FOUND":
-            setErrorMsg("No user found with this email.");
-            break;
-          case "INVALID_PASSWORD":
-            setErrorMsg("Incorrect password.");
-            break;
-          default:
-            setErrorMsg("Something went wrong.");
-        }
-      } catch {
-        setErrorMsg("An unexpected error occurred.");
-      }
+      setErrorMsg("Invalid email or password.");
     } else if (res?.ok) {
       router.push("/");
     }
