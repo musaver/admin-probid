@@ -15,6 +15,7 @@ import {
   KeyRound,
   ClipboardList,
   LogOut,
+  MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -28,6 +29,7 @@ const navigation: NavItem[] = [
   { name: 'Dashboard',   href: '/',            icon: LayoutDashboard },
   { name: 'Properties',  href: '/properties',  icon: Building2 },
   { name: 'Users',       href: '/users',       icon: Users },
+  { name: 'Messaging',   href: '/messaging',   icon: MessageSquare },
   { name: 'Admin Users', href: '/admins',      icon: ShieldCheck },
   { name: 'Admin Roles', href: '/roles',       icon: KeyRound },
   { name: 'Admin Logs',  href: '/logs',        icon: ClipboardList },

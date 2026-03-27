@@ -1,6 +1,7 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,7 +15,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, Plus, Pencil, Trash2, ArrowUpDown, Users, Mail, Loader2, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Plus, Pencil, Trash2, ArrowUpDown, Users, Mail, Loader2, CheckCircle2, Search, ChevronUp, ChevronDown, FileSpreadsheet } from 'lucide-react';
+import BulkUploadModal from '@/app/components/BulkUploadModal';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PropertyRow {
   property: {
@@ -69,8 +72,46 @@ function formatStatus(status: string) {
 }
 
 export default function PropertiesList() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Initialize state from URL or defaults
   const [properties, setProperties] = useState<PropertyRow[]>([]);
+  const [totalProperties, setTotalProperties] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
+    key: searchParams.get('sort') || 'createdAt',
+    direction: (searchParams.get('direction') as 'asc' | 'desc') || 'desc',
+  });
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1'));
+  const [pageSize, setPageSize] = useState(searchParams.get('pageSize') || '10');
+
+  // Update URL whenever filter/sort/page changes
+  const updateUrl = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (search) params.set('search', search); else params.delete('search');
+    if (statusFilter !== 'all') params.set('status', statusFilter); else params.delete('status');
+    params.set('sort', sortConfig.key);
+    params.set('direction', sortConfig.direction);
+    params.set('page', currentPage.toString());
+    params.set('pageSize', pageSize);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [search, statusFilter, sortConfig, currentPage, pageSize, pathname, router, searchParams]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateUrl();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [updateUrl]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, pageSize]);
 
   // Status change dialog
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -95,22 +136,49 @@ export default function PropertiesList() {
   const [alertSending, setAlertSending] = useState(false);
   const [alertResult, setAlertResult] = useState<{ success: boolean; sent: number; failed: any[] } | null>(null);
 
-  const fetchProperties = async () => {
+  // Bulk upload modal
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+
+  const fetchProperties = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/properties');
+      const params = new URLSearchParams({
+        search,
+        status: statusFilter,
+        sort: sortConfig.key,
+        direction: sortConfig.direction,
+        page: currentPage.toString(),
+        pageSize: pageSize,
+      });
+      const res = await fetch(`/api/properties?${params.toString()}`);
       const data = await res.json();
-      setProperties(data);
+      setProperties(data.properties || []);
+      setTotalProperties(data.total || 0);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, statusFilter, sortConfig, currentPage, pageSize]);
 
   useEffect(() => {
     fetchProperties();
-  }, []);
+  }, [fetchProperties]);
+
+  const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalProperties / parseInt(pageSize));
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: string) => {
+    if (sortConfig.key !== key) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />;
+  };
 
   // Status modal
   const openStatusModal = (prop: PropertyRow) => {
@@ -257,12 +325,55 @@ export default function PropertiesList() {
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
+          <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Import Properties
+          </Button>
           <Button asChild>
             <Link href="/properties/add">
               <Plus className="mr-2 h-4 w-4" />
               Add Property
             </Link>
           </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by title, address, sale ID or creator..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full md:w-[180px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            {PROPERTY_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>{formatStatus(s)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">Show:</span>
+          <Select value={pageSize} onValueChange={setPageSize}>
+            <SelectTrigger className="w-[100px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+              <SelectItem value="500">500</SelectItem>
+              <SelectItem value="all">View All</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -275,77 +386,100 @@ export default function PropertiesList() {
               ))}
             </div>
           ) : (
-            <Table>
+            <Table className="text-xs">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>City</TableHead>
-                  <TableHead>Sale ID</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Min Bid</TableHead>
-                  <TableHead>Created By</TableHead>
-                  <TableHead>Bidders</TableHead>
-                  <TableHead>Created At</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('title')}>
+                    <div className="flex items-center whitespace-nowrap">Title {getSortIcon('title')}</div>
+                  </TableHead>
+                  <TableHead className="py-2 px-3">Address</TableHead>
+                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('status')}>
+                    <div className="flex items-center whitespace-nowrap">Status {getSortIcon('status')}</div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('minBid')}>
+                    <div className="flex items-center whitespace-nowrap">Min Bid {getSortIcon('minBid')}</div>
+                  </TableHead>
+                  <TableHead className="py-2 px-3">County</TableHead>
+                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('bidders')}>
+                    <div className="flex items-center whitespace-nowrap">Bidders {getSortIcon('bidders')}</div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('createdAt')}>
+                    <div className="flex items-center whitespace-nowrap">Created At {getSortIcon('createdAt')}</div>
+                  </TableHead>
+                  <TableHead className="text-right py-2 px-3">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {properties.length > 0 ? (
                   properties.map((row) => (
                     <TableRow key={row.property.id}>
-                      <TableCell className="font-medium max-w-[200px] truncate">{row.property.title}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{row.property.address || '—'}</TableCell>
-                      <TableCell>{row.property.city || '—'}</TableCell>
-                      <TableCell>{row.property.saleId}</TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariant[row.property.status] || 'secondary'}>
+                      <TableCell className="font-medium max-w-[160px] truncate py-1.5 px-3">{row.property.title}</TableCell>
+                      <TableCell className="max-w-[140px] truncate py-1.5 px-3">{row.property.address || '—'}</TableCell>
+                      <TableCell className="py-1.5 px-3">
+                        <Badge variant={statusVariant[row.property.status] || 'secondary'} className="text-xs">
                           {formatStatus(row.property.status)}
                         </Badge>
                       </TableCell>
-                      <TableCell>{row.property.minBid ? `$${Number(row.property.minBid).toLocaleString()}` : '—'}</TableCell>
-                      <TableCell>{row.creator?.name || row.creator?.email || '—'}</TableCell>
-                      <TableCell>
+                      <TableCell className="py-1.5 px-3">{row.property.minBid ? `$${Number(row.property.minBid).toLocaleString()}` : '—'}</TableCell>
+                      <TableCell className="py-1.5 px-3">{row.creator?.name || row.creator?.email || '—'}</TableCell>
+                      <TableCell className="py-1.5 px-3">
                         {row.linkedBiddersCount > 0 ? (
                           <Badge
                             variant="secondary"
-                            className="cursor-pointer hover:bg-primary/20 transition-colors"
+                            className="cursor-pointer hover:bg-primary/20 transition-colors text-xs"
                             onClick={() => openBiddersDialog(row)}
                           >
                             <Users className="mr-1 h-3 w-3" />
                             {row.linkedBiddersCount}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground text-sm">0</span>
+                          <span className="text-muted-foreground">0</span>
                         )}
                       </TableCell>
-                      <TableCell>{new Date(row.property.createdAt).toLocaleString()}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end flex-wrap">
+                      <TableCell className="whitespace-nowrap py-1.5 px-3">{new Date(row.property.createdAt).toLocaleString()}</TableCell>
+                      <TableCell className="text-right py-1.5 px-3">
+                        <TooltipProvider delayDuration={200}>
+                        <div className="flex gap-1 justify-end whitespace-nowrap">
                           {row.linkedBiddersCount > 0 && (
-                            <Button variant="outline" size="sm" onClick={() => openAlertDialog(row)}>
-                              <Mail className="mr-1 h-3 w-3" />
-                              Alert
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => openAlertDialog(row)}>
+                                  <Mail className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Send Alert</TooltipContent>
+                            </Tooltip>
                           )}
-                          <Button variant="outline" size="sm" onClick={() => openStatusModal(row)}>
-                            <ArrowUpDown className="mr-1 h-3 w-3" />
-                            Status
-                          </Button>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/properties/edit/${row.property.id}`}>
-                              <Pencil className="mr-1 h-3 w-3" />
-                              Edit
-                            </Link>
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm">
-                                <Trash2 className="mr-1 h-3 w-3" />
-                                Delete
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => openStatusModal(row)}>
+                                <ArrowUpDown className="h-3 w-3" />
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
+                            </TooltipTrigger>
+                            <TooltipContent>Change Status</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" asChild>
+                                <Link href={`/properties/edit/${row.property.id}`}>
+                                  <Pencil className="h-3 w-3" />
+                                </Link>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit Property</TooltipContent>
+                          </Tooltip>
+                          <AlertDialog>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="destructive" size="sm" className="h-7 px-2 text-xs">
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete Property</TooltipContent>
+                            </Tooltip>
+                            <AlertDialogContent className="sm:max-w-md">
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete Property</AlertDialogTitle>
                                 <AlertDialogDescription>
@@ -359,12 +493,13 @@ export default function PropertiesList() {
                             </AlertDialogContent>
                           </AlertDialog>
                         </div>
+                        </TooltipProvider>
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       No properties found
                     </TableCell>
                   </TableRow>
@@ -375,9 +510,57 @@ export default function PropertiesList() {
         </CardContent>
       </Card>
 
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <p className="text-sm text-muted-foreground">
+            Showing {Math.min((currentPage - 1) * parseInt(pageSize) + 1, totalProperties)} to {Math.min(currentPage * parseInt(pageSize), totalProperties)} of {totalProperties} properties
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? 'default' : 'outline'}
+                  size="sm"
+                  className="w-9"
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </Button>
+              )).filter((_, i) => {
+                if (totalPages <= 7) return true;
+                return i === 0 || i === totalPages - 1 || Math.abs(i + 1 - currentPage) <= 1;
+              }).map((item, i, arr) => {
+                const prev = arr[i - 1];
+                if (prev && (item as any).key - (prev as any).key > 1) {
+                  return <React.Fragment key={`ellipsis-${i}`}><span className="px-1 text-muted-foreground">...</span>{item}</React.Fragment>;
+                }
+                return item;
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Change Status Dialog */}
       <Dialog open={showStatusModal} onOpenChange={(open) => { if (!open) closeStatusModal(); }}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Change Property Status</DialogTitle>
           </DialogHeader>
@@ -417,7 +600,7 @@ export default function PropertiesList() {
 
       {/* Linked Bidders Dialog */}
       <Dialog open={showBiddersDialog} onOpenChange={(open) => { if (!open) closeBiddersDialog(); }}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Linked Bidders — {biddersProperty?.property.title}</DialogTitle>
           </DialogHeader>
@@ -464,7 +647,7 @@ export default function PropertiesList() {
 
       {/* Send Alert Dialog */}
       <Dialog open={showAlertDialog} onOpenChange={(open) => { if (!open) closeAlertDialog(); }}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Send Alert — {alertProperty?.property.title}</DialogTitle>
           </DialogHeader>
@@ -549,6 +732,13 @@ export default function PropertiesList() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        open={showBulkUpload}
+        onClose={() => setShowBulkUpload(false)}
+        onSuccess={fetchProperties}
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname === "/" ||
     request.nextUrl.pathname.startsWith("/properties") ||
     request.nextUrl.pathname.startsWith("/users") ||
+    request.nextUrl.pathname.startsWith("/messaging") ||
     request.nextUrl.pathname.startsWith("/admins") ||
     request.nextUrl.pathname.startsWith("/roles") ||
     request.nextUrl.pathname.startsWith("/logs");
@@ -35,6 +36,7 @@ export const config = {
     "/",
     "/properties/:path*",
     "/users/:path*",
+    "/messaging/:path*",
     "/admins/:path*",
     "/roles/:path*",
     "/logs/:path*",

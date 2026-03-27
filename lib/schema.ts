@@ -186,6 +186,7 @@ export const conversations = mysqlTable('conversations', {
   id: varchar('id', { length: 255 }).primaryKey(),
   participant1Id: varchar('participant1_id', { length: 255 }).notNull(), // FK to user.id
   participant2Id: varchar('participant2_id', { length: 255 }).notNull(), // FK to user.id
+  propertyId: varchar('property_id', { length: 255 }), // FK to property.id
   lastMessageAt: datetime('last_message_at'),
   createdAt: datetime('created_at').notNull(),
   sharedKey: text('shared_key'), // Shared key for E2EE (simplified)
