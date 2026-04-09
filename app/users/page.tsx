@@ -45,6 +45,24 @@ interface BidderProperty {
   linkedAt: string;
 }
 
+interface CountyUser {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+function formatPhone(phone: string | null): string {
+  if (!phone) return '—';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits[0] === '1') {
+    return `${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return phone;
+}
+
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   active: 'default', sold: 'secondary', withdrawn: 'destructive', on_list: 'outline',
   sold_at_tax_sale: 'secondary', redeemed: 'outline', voided: 'destructive',
@@ -75,24 +93,35 @@ export default function UsersList() {
 
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || 'all');
+  const [countyFilter, setCountyFilter] = useState(searchParams.get('countyId') || 'all');
+  const [countyUsers, setCountyUsers] = useState<CountyUser[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: keyof User; direction: 'asc' | 'desc' }>({
     key: (searchParams.get('sort') as keyof User) || 'createdAt',
     direction: (searchParams.get('direction') as 'asc' | 'desc') || 'desc',
   });
   const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1'));
-  const [pageSize, setPageSize] = useState(searchParams.get('pageSize') || '10');
+  const [pageSize, setPageSize] = useState(searchParams.get('pageSize') || '100');
+
+  // Fetch county users for filter dropdown
+  useEffect(() => {
+    fetch('/api/users?type=county&pageSize=all')
+      .then(r => r.json())
+      .then(data => setCountyUsers(data.users || []))
+      .catch(() => {});
+  }, []);
 
   // Update URL whenever filter/sort/page changes
   const updateUrl = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
     if (search) params.set('search', search); else params.delete('search');
     if (typeFilter !== 'all') params.set('type', typeFilter); else params.delete('type');
+    if (countyFilter !== 'all') params.set('countyId', countyFilter); else params.delete('countyId');
     params.set('sort', sortConfig.key);
     params.set('direction', sortConfig.direction);
     params.set('page', currentPage.toString());
     params.set('pageSize', pageSize);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [search, typeFilter, sortConfig, currentPage, pageSize, pathname, router, searchParams]);
+  }, [search, typeFilter, countyFilter, sortConfig, currentPage, pageSize, pathname, router, searchParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -120,6 +149,7 @@ export default function UsersList() {
         page: currentPage.toString(),
         pageSize: pageSize,
       });
+      if (countyFilter !== 'all') params.set('countyId', countyFilter);
       const res = await fetch(`/api/users?${params.toString()}`);
       const data = await res.json();
       setUsers(data.users || []);
@@ -129,7 +159,7 @@ export default function UsersList() {
     } finally {
       setLoading(false);
     }
-  }, [search, typeFilter, sortConfig, currentPage, pageSize]);
+  }, [search, typeFilter, countyFilter, sortConfig, currentPage, pageSize]);
 
   useEffect(() => {
     fetchUsers();
@@ -137,7 +167,7 @@ export default function UsersList() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, typeFilter, pageSize]);
+  }, [search, typeFilter, countyFilter, pageSize]);
 
   const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalUsers / parseInt(pageSize));
 
@@ -261,6 +291,17 @@ export default function UsersList() {
             <SelectItem value="county">County</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={countyFilter} onValueChange={setCountyFilter}>
+          <SelectTrigger className="w-full md:w-[200px]">
+            <SelectValue placeholder="All Counties" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Counties</SelectItem>
+            {countyUsers.map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name || c.email}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground whitespace-nowrap">Show:</span>
           <Select value={pageSize} onValueChange={setPageSize}>
@@ -318,7 +359,7 @@ export default function UsersList() {
                           {user.type || 'bidder'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="py-1.5 px-3">{user.phone || '—'}</TableCell>
+                      <TableCell className="py-1.5 px-3">{formatPhone(user.phone)}</TableCell>
                       <TableCell className="whitespace-nowrap py-1.5 px-3">{new Date(user.createdAt).toLocaleString()}</TableCell>
                       <TableCell className="text-right py-1.5 px-3">
                         <TooltipProvider delayDuration={200}>

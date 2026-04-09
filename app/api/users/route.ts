@@ -9,10 +9,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const type = searchParams.get('type') || 'all';
+    const countyId = searchParams.get('countyId') || '';
     const sort = searchParams.get('sort') || 'createdAt';
     const direction = searchParams.get('direction') || 'desc';
     const page = parseInt(searchParams.get('page') || '1');
-    const pageSize = searchParams.get('pageSize') || '10';
+    const pageSize = searchParams.get('pageSize') || '100';
 
     const whereClauses = [];
     if (search) {
@@ -26,6 +27,9 @@ export async function GET(request: Request) {
     }
     if (type !== 'all') {
       whereClauses.push(eq(user.type, type as any));
+    }
+    if (countyId) {
+      whereClauses.push(eq(user.countyId, countyId));
     }
 
     const where = whereClauses.length > 0 ? and(...whereClauses) : undefined;

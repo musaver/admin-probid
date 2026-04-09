@@ -3,24 +3,54 @@ import { db } from '@/lib/db';
 import { adminUsers, adminRoles } from '@/lib/schema';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import { eq } from 'drizzle-orm';
+import { eq, like, or, and, asc, desc, count } from 'drizzle-orm';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const admins = await db
+    const { searchParams } = new URL(req.url);
+    const search = searchParams.get('search') || '';
+    const roleId = searchParams.get('roleId') || '';
+    const sort = searchParams.get('sort') || 'createdAt';
+    const direction = searchParams.get('direction') || 'desc';
+    const page = parseInt(searchParams.get('page') || '1');
+    const pageSize = searchParams.get('pageSize') || '100';
+
+    const whereClauses = [];
+    if (search) {
+      whereClauses.push(
+        or(
+          like(adminUsers.name, `%${search}%`),
+          like(adminUsers.email, `%${search}%`)
+        )
+      );
+    }
+    if (roleId) {
+      whereClauses.push(eq(adminUsers.roleId, roleId));
+    }
+
+    const where = whereClauses.length > 0 ? and(...whereClauses) : undefined;
+
+    const totalResult = await db.select({ value: count() }).from(adminUsers).where(where);
+    const total = totalResult[0].value;
+
+    const sortColumn = (adminUsers as any)[sort] || adminUsers.createdAt;
+    const rows = await db
       .select({
         admin: adminUsers,
         role: {
           id: adminRoles.id,
           name: adminRoles.name,
-          permissions: adminRoles.permissions
-        }
+          permissions: adminRoles.permissions,
+        },
       })
       .from(adminUsers)
-      .leftJoin(adminRoles, eq(adminUsers.roleId, adminRoles.id));
+      .leftJoin(adminRoles, eq(adminUsers.roleId, adminRoles.id))
+      .where(where)
+      .orderBy(direction === 'asc' ? asc(sortColumn) : desc(sortColumn))
+      .limit(pageSize === 'all' ? 1000000 : parseInt(pageSize))
+      .offset(pageSize === 'all' ? 0 : (page - 1) * parseInt(pageSize));
 
-    // Remove passwords from response and format data
-    const adminsWithoutPasswords = admins.map(({ admin, role }) => ({
+    const admins = rows.map(({ admin, role }) => ({
       admin: {
         id: admin.id,
         email: admin.email,
@@ -28,12 +58,12 @@ export async function GET() {
         roleId: admin.roleId,
         role: admin.role,
         createdAt: admin.createdAt,
-        updatedAt: admin.updatedAt
+        updatedAt: admin.updatedAt,
       },
-      role
+      role,
     }));
 
-    return NextResponse.json(adminsWithoutPasswords);
+    return NextResponse.json({ admins, total });
   } catch (error) {
     console.error('Error fetching admins:', error);
     return NextResponse.json({ error: 'Failed to fetch admins' }, { status: 500 });

@@ -38,6 +38,12 @@ interface PropertyRow {
   linkedBiddersCount: number;
 }
 
+interface CountyUser {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
 interface LinkedBidder {
   id: string;
   status: string | null;
@@ -83,24 +89,35 @@ export default function PropertiesList() {
 
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
+  const [countyFilter, setCountyFilter] = useState(searchParams.get('countyId') || 'all');
+  const [countyUsers, setCountyUsers] = useState<CountyUser[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
     key: searchParams.get('sort') || 'createdAt',
     direction: (searchParams.get('direction') as 'asc' | 'desc') || 'desc',
   });
   const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1'));
-  const [pageSize, setPageSize] = useState(searchParams.get('pageSize') || '10');
+  const [pageSize, setPageSize] = useState(searchParams.get('pageSize') || '100');
+
+  // Fetch county users for filter dropdown
+  useEffect(() => {
+    fetch('/api/users?type=county&pageSize=all')
+      .then(r => r.json())
+      .then(data => setCountyUsers(data.users || []))
+      .catch(() => {});
+  }, []);
 
   // Update URL whenever filter/sort/page changes
   const updateUrl = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
     if (search) params.set('search', search); else params.delete('search');
     if (statusFilter !== 'all') params.set('status', statusFilter); else params.delete('status');
+    if (countyFilter !== 'all') params.set('countyId', countyFilter); else params.delete('countyId');
     params.set('sort', sortConfig.key);
     params.set('direction', sortConfig.direction);
     params.set('page', currentPage.toString());
     params.set('pageSize', pageSize);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [search, statusFilter, sortConfig, currentPage, pageSize, pathname, router, searchParams]);
+  }, [search, statusFilter, countyFilter, sortConfig, currentPage, pageSize, pathname, router, searchParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -111,9 +128,35 @@ export default function PropertiesList() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, pageSize]);
+  }, [search, statusFilter, countyFilter, pageSize]);
 
-  // Status change dialog
+  // Inline status change
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+
+  const handleInlineStatusChange = async (row: PropertyRow, newStatus: string) => {
+    if (newStatus === row.property.status) return;
+    setUpdatingStatusId(row.property.id);
+    try {
+      const res = await fetch(`/api/properties/${row.property.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        setProperties(prev => prev.map(p =>
+          p.property.id === row.property.id
+            ? { ...p, property: { ...p.property, status: newStatus } }
+            : p
+        ));
+      }
+    } catch (error) {
+      console.error('Error updating property status:', error);
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
+
+  // Status change dialog (kept for reference, no longer triggered from list)
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<PropertyRow | null>(null);
   const [newStatus, setNewStatus] = useState('');
@@ -150,6 +193,7 @@ export default function PropertiesList() {
         page: currentPage.toString(),
         pageSize: pageSize,
       });
+      if (countyFilter !== 'all') params.set('countyId', countyFilter);
       const res = await fetch(`/api/properties?${params.toString()}`);
       const data = await res.json();
       setProperties(data.properties || []);
@@ -159,7 +203,7 @@ export default function PropertiesList() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, sortConfig, currentPage, pageSize]);
+  }, [search, statusFilter, countyFilter, sortConfig, currentPage, pageSize]);
 
   useEffect(() => {
     fetchProperties();
@@ -359,6 +403,17 @@ export default function PropertiesList() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={countyFilter} onValueChange={setCountyFilter}>
+          <SelectTrigger className="w-full md:w-[200px]">
+            <SelectValue placeholder="All Counties" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Counties</SelectItem>
+            {countyUsers.map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name || c.email}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground whitespace-nowrap">Show:</span>
           <Select value={pageSize} onValueChange={setPageSize}>
@@ -415,10 +470,23 @@ export default function PropertiesList() {
                     <TableRow key={row.property.id}>
                       <TableCell className="font-medium max-w-[160px] truncate py-1.5 px-3">{row.property.title}</TableCell>
                       <TableCell className="max-w-[140px] truncate py-1.5 px-3">{row.property.address || '—'}</TableCell>
-                      <TableCell className="py-1.5 px-3">
-                        <Badge variant={statusVariant[row.property.status] || 'secondary'} className="text-xs">
-                          {formatStatus(row.property.status)}
-                        </Badge>
+                      <TableCell className="py-1 px-3">
+                        <Select
+                          value={row.property.status}
+                          onValueChange={(val) => handleInlineStatusChange(row, val)}
+                          disabled={updatingStatusId === row.property.id}
+                        >
+                          <SelectTrigger className="h-7 text-xs w-[155px] px-2">
+                            {updatingStatusId === row.property.id
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <SelectValue />}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PROPERTY_STATUSES.map((s) => (
+                              <SelectItem key={s} value={s} className="text-xs">{formatStatus(s)}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="py-1.5 px-3">{row.property.minBid ? `$${Number(row.property.minBid).toLocaleString()}` : '—'}</TableCell>
                       <TableCell className="py-1.5 px-3">{row.creator?.name || row.creator?.email || '—'}</TableCell>
@@ -450,14 +518,6 @@ export default function PropertiesList() {
                               <TooltipContent>Send Alert</TooltipContent>
                             </Tooltip>
                           )}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => openStatusModal(row)}>
-                                <ArrowUpDown className="h-3 w-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Change Status</TooltipContent>
-                          </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button variant="outline" size="sm" className="h-7 px-2 text-xs" asChild>
