@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 import {
   Dialog,
@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   FileSpreadsheet,
   FileDown,
@@ -40,7 +41,7 @@ import {
 } from "lucide-react";
 
 interface ImportedProperty {
-  Title: string;
+  Title?: string;
   "Sale ID"?: string;
   "Parcel ID"?: string;
   Address?: string;
@@ -48,9 +49,16 @@ interface ImportedProperty {
   "Zip Code"?: number | string;
   "Minimum Bid"?: number;
   "Winning Bid"?: number;
+  "Bidder Email"?: string;
+  "Bidder Number"?: string;
+  "Auction Start Date"?: string;
   "Auction End Date"?: string;
   Owners?: string;
   Status?: string;
+  /** Legacy template headers — still recognized by import parser */
+  "Winning Bidder Email"?: string;
+  "Winning Bidder Number"?: string;
+  "Redemption End Date"?: string;
 }
 
 interface CountyUser {
@@ -79,6 +87,8 @@ export default function BulkUploadModal({
   const [countyUsers, setCountyUsers] = useState<CountyUser[]>([]);
   const [countyUserId, setCountyUserId] = useState<string>("");
   const [loadingCounties, setLoadingCounties] = useState(false);
+  /** When true, each row must have Parcel ID + Sale ID + Status; only updates `status` on existing properties. */
+  const [statusOnlyImport, setStatusOnlyImport] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -101,6 +111,7 @@ export default function BulkUploadModal({
       setUploading(false);
       setStage("select");
       setCountyUserId("");
+      setStatusOnlyImport(false);
     }
   }, [open]);
 
@@ -114,6 +125,9 @@ export default function BulkUploadModal({
       "Zip Code",
       "Minimum Bid",
       "Winning Bid",
+      "Bidder Email",
+      "Bidder Number",
+      "Auction Start Date",
       "Auction End Date",
       "Owners",
       "Status",
@@ -128,7 +142,10 @@ export default function BulkUploadModal({
         "Zip Code": "12345",
         "Minimum Bid": 1000,
         "Winning Bid": 1200,
-        "Auction End Date": "2026-12-31",
+        "Bidder Email": "winner@example.com",
+        "Bidder Number": "142",
+        "Auction Start Date": "2026-05-01",
+        "Auction End Date": "2026-06-01",
         Owners: "Doe, John; Smith, Jane",
         Status: "active",
       },
@@ -141,7 +158,10 @@ export default function BulkUploadModal({
         "Zip Code": "12345",
         "Minimum Bid": 500,
         "Winning Bid": 0,
-        "Auction End Date": "2026-12-31",
+        "Bidder Email": "",
+        "Bidder Number": "",
+        "Auction Start Date": "",
+        "Auction End Date": "2026-06-01",
         Owners: "Brown, Bob",
         Status: "active",
       },
@@ -170,26 +190,65 @@ export default function BulkUploadModal({
       const ws = wb.Sheets[wsname];
       const jsonData = XLSX.utils.sheet_to_json<ImportedProperty>(ws);
       setData(jsonData);
-      validateData(jsonData);
+      validateData(jsonData, statusOnlyImport);
       setStage("preview");
     };
     reader.readAsBinaryString(file);
   };
 
-  const validateData = (items: ImportedProperty[]) => {
-    const newErrors: string[] = [];
-    if (items.length === 0) {
-      newErrors.push("File appears to be empty.");
-      setErrors(newErrors);
-      return;
-    }
-    items.forEach((item, index) => {
-      if (!item.Title) {
-        newErrors.push(`Row ${index + 2}: Missing required 'Title'.`);
+  const validateData = useCallback(
+    (items: ImportedProperty[], statusOnly: boolean) => {
+      const newErrors: string[] = [];
+      if (items.length === 0) {
+        newErrors.push("File appears to be empty.");
+        setErrors(newErrors);
+        return;
       }
-    });
-    setErrors(newErrors);
-  };
+      items.forEach((item, index) => {
+        const sheetRow = index + 2;
+        const parcel =
+          item["Parcel ID"] !== undefined &&
+          item["Parcel ID"] !== null &&
+          String(item["Parcel ID"]).trim() !== "";
+        const sale =
+          item["Sale ID"] !== undefined &&
+          item["Sale ID"] !== null &&
+          String(item["Sale ID"]).trim() !== "";
+        const status =
+          item.Status !== undefined &&
+          item.Status !== null &&
+          String(item.Status).trim() !== "";
+
+        if (statusOnly) {
+          if (!parcel) {
+            newErrors.push(`Row ${sheetRow}: Status-only mode requires Parcel ID.`);
+          }
+          if (!sale) {
+            newErrors.push(`Row ${sheetRow}: Status-only mode requires Sale ID.`);
+          }
+          if (!status) {
+            newErrors.push(`Row ${sheetRow}: Status-only mode requires Status.`);
+          }
+        } else {
+          if (
+            item.Title === undefined ||
+            item.Title === null ||
+            String(item.Title).trim() === ""
+          ) {
+            newErrors.push(`Row ${sheetRow}: Missing required Title.`);
+          }
+        }
+      });
+      setErrors(newErrors);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (stage === "preview" && data.length > 0) {
+      validateData(data, statusOnlyImport);
+    }
+  }, [statusOnlyImport, stage, data, validateData]);
 
   const handleUpload = async () => {
     if (!countyUserId) {
@@ -201,13 +260,46 @@ export default function BulkUploadModal({
       const res = await fetch("/api/properties/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ properties: data, countyUserId }),
+        body: JSON.stringify({
+          properties: data,
+          countyUserId,
+          statusOnly: statusOnlyImport,
+        }),
       });
 
+      const text = await res.text();
       if (!res.ok) {
-        const text = await res.text();
         throw new Error(text || "Upload failed");
       }
+
+      let result: {
+        inserted: number;
+        updated: number;
+        errors?: { row: number; message: string }[];
+        warnings?: { row: number; message: string }[];
+      };
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error(text || "Invalid response");
+      }
+
+      const summary = [
+        `Inserted: ${result.inserted}`,
+        `Updated: ${result.updated}`,
+      ];
+      if (result.warnings?.length) {
+        summary.push(`Warnings: ${result.warnings.length}`);
+      }
+      if (result.errors?.length) {
+        summary.push(`Rows not applied: ${result.errors.length}`);
+        const preview = result.errors.slice(0, 5).map(
+          (e) => `  Row ${e.row}: ${e.message}`
+        );
+        summary.push(...preview);
+        if (result.errors.length > 5) summary.push(`  …and ${result.errors.length - 5} more`);
+      }
+      alert(summary.join("\n"));
 
       onSuccess();
       onClose();
@@ -293,6 +385,24 @@ export default function BulkUploadModal({
               />
             </div>
 
+            <div className="flex items-start gap-3 rounded-lg border bg-background p-4">
+              <Checkbox
+                id="status-only-import"
+                checked={statusOnlyImport}
+                onCheckedChange={(v) => setStatusOnlyImport(v === true)}
+              />
+              <div className="grid gap-1.5 leading-snug">
+                <Label htmlFor="status-only-import" className="cursor-pointer font-medium">
+                  Status-only rows (advanced)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Each row needs Parcel ID, Sale ID, and Status. Updates{" "}
+                  <strong>status</strong> on existing listings for this county (match on both
+                  IDs). Seed properties with a normal import first.
+                </p>
+              </div>
+            </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={onClose}>
                 Cancel
@@ -324,15 +434,36 @@ export default function BulkUploadModal({
               <Alert>
                 <CheckCircle2 className="h-4 w-4" />
                 <AlertDescription>
-                  Ready to import <strong>{data.length}</strong> properties for{" "}
+                  Ready to import <strong>{data.length}</strong> row(s) for{" "}
                   <strong>
                     {countyUsers.find((c) => c.id === countyUserId)?.name ||
                       countyUsers.find((c) => c.id === countyUserId)?.email}
                   </strong>
-                  .
+                  {statusOnlyImport ? (
+                    <>
+                      {" "}
+                      — <strong>status-only</strong> (existing Parcel ID + Sale ID).
+                    </>
+                  ) : (
+                    <>
+                      {" "}
+                      — new rows merge on <strong>Parcel ID</strong> + <strong>Sale ID</strong>.
+                    </>
+                  )}
                 </AlertDescription>
               </Alert>
             )}
+
+            <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-4">
+              <Checkbox
+                id="status-only-preview"
+                checked={statusOnlyImport}
+                onCheckedChange={(v) => setStatusOnlyImport(v === true)}
+              />
+              <Label htmlFor="status-only-preview" className="cursor-pointer text-sm leading-snug font-normal">
+                Status-only import (Parcel ID + Sale ID + Status)
+              </Label>
+            </div>
 
             <div className="max-h-[350px] overflow-auto rounded-md border">
               <Table>
@@ -346,7 +477,10 @@ export default function BulkUploadModal({
                     <TableHead className="whitespace-nowrap">Zip Code</TableHead>
                     <TableHead className="whitespace-nowrap">Min Bid</TableHead>
                     <TableHead className="whitespace-nowrap">Winning Bid</TableHead>
-                    <TableHead className="whitespace-nowrap">Auction End</TableHead>
+                    <TableHead className="whitespace-nowrap">Bidder email</TableHead>
+                    <TableHead className="whitespace-nowrap">Bidder #</TableHead>
+                    <TableHead className="whitespace-nowrap">Auction start</TableHead>
+                    <TableHead className="whitespace-nowrap">Auction end</TableHead>
                     <TableHead className="whitespace-nowrap">Owners</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
                   </TableRow>
@@ -355,10 +489,13 @@ export default function BulkUploadModal({
                   {data.slice(0, 50).map((row, i) => (
                     <TableRow key={i}>
                       <TableCell className="whitespace-nowrap">
-                        {row.Title || (
+                        {!statusOnlyImport &&
+                        (!row.Title || String(row.Title).trim() === "") ? (
                           <span className="text-destructive font-medium">
                             Missing
                           </span>
+                        ) : (
+                          row.Title || "—"
                         )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
@@ -381,6 +518,15 @@ export default function BulkUploadModal({
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {row["Winning Bid"] || "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap max-w-[140px] truncate" title={row["Bidder Email"]}>
+                        {(row["Bidder Email"] as string | undefined) || (row["Winning Bidder Email"] as string | undefined) || "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {(row["Bidder Number"] as string | undefined) || (row["Winning Bidder Number"] as string | undefined) || "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {(row["Auction Start Date"] as string | undefined) || (row["Redemption End Date"] as string | undefined) || "—"}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {row["Auction End Date"] || "—"}

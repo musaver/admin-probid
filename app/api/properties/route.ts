@@ -94,6 +94,7 @@ export async function POST(request: Request) {
       lotSize: body.lotSize || null,
       owners: body.owners || null,
       auctionEnd: body.auctionEnd ? new Date(body.auctionEnd) : null,
+      auctionStart: body.auctionStart ? new Date(body.auctionStart) : null,
       minBid: body.minBid || null,
       winningBid: body.winningBid || null,
       winningBidderId: body.winningBidderId || null,

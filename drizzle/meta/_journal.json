@@ -15,6 +15,20 @@
       "when": 1748429957420,
       "tag": "0001_nice_goliath",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1749139200000,
+      "tag": "0002_property_redemption",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1749200000000,
+      "tag": "0003_rename_redemption_to_auction_start",
+      "breakpoints": true
     }
   ]
 }

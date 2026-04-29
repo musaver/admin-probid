@@ -99,7 +99,8 @@ export const property = mysqlTable('property', {
   yearBuilt: int('year_built'),
   lotSize: varchar('lot_size', { length: 50 }),
   owners: json('owners'), // List of owner names ["Smith, John", ...]
-  auctionEnd: datetime('auction_end'),
+  auctionStart: datetime('auction_start'), // Auction start date (scheduled sale start)
+  auctionEnd: datetime('auction_end'), // Auction end / closing date for the sale
   minBid: decimal('min_bid', { precision: 12, scale: 2 }),
   winningBid: decimal('winning_bid', { precision: 12, scale: 2 }), // Manual override or record
   winningBidderId: varchar('winning_bidder_id', { length: 255 }), // Linked to user.id

@@ -54,6 +54,7 @@ export default function AddProperty() {
   const [minBid, setMinBid] = useState('');
   const [winningBid, setWinningBid] = useState('');
   const [status, setStatus] = useState('active');
+  const [auctionStart, setAuctionStart] = useState('');
   const [auctionEnd, setAuctionEnd] = useState('');
 
   // Assignment
@@ -71,12 +72,16 @@ export default function AddProperty() {
   useEffect(() => {
     const fetchCountyUsers = async () => {
       try {
-        const res = await fetch('/api/users');
+        const res = await fetch('/api/users?type=county&pageSize=all');
         const data = await res.json();
+        if (!res.ok) throw new Error(data?.error ?? 'Failed to fetch users');
+        const list = Array.isArray(data?.users) ? data.users : [];
         setCountyUsers(
-          data
-            .filter((u: any) => u.type === 'county')
-            .map((u: any) => ({ id: u.id, name: u.name, email: u.email }))
+          list.map((u: { id: string; name: string | null; email: string }) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+          }))
         );
       } catch (err) {
         console.error('Error fetching county users:', err);
@@ -166,6 +171,7 @@ export default function AddProperty() {
           city: city || null,
           zipCode: zipCode || null,
           owners: owners.filter(o => o.trim()),
+          auctionStart: auctionStart || null,
           auctionEnd: auctionEnd || null,
           minBid: cleanMinBid,
           winningBid: cleanWinningBid,
@@ -311,7 +317,7 @@ export default function AddProperty() {
                   <Input id="winningBid" value={winningBid} onChange={e => setWinningBid(e.target.value)} placeholder="0" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="status">Property Status</Label>
                   <Select value={status} onValueChange={setStatus}>
@@ -325,8 +331,14 @@ export default function AddProperty() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="auctionEnd">Auction End Date</Label>
+                  <Label htmlFor="auctionStart">Auction start date</Label>
+                  <Input id="auctionStart" type="date" value={auctionStart} onChange={e => setAuctionStart(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="auctionEnd">Auction end date</Label>
                   <Input id="auctionEnd" type="date" value={auctionEnd} onChange={e => setAuctionEnd(e.target.value)} />
                 </div>
               </div>
