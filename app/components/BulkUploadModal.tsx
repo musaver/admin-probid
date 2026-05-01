@@ -275,6 +275,7 @@ export default function BulkUploadModal({
       let result: {
         inserted: number;
         updated: number;
+        biddersLinked?: number;
         errors?: { row: number; message: string }[];
         warnings?: { row: number; message: string }[];
       };
@@ -288,6 +289,9 @@ export default function BulkUploadModal({
         `Inserted: ${result.inserted}`,
         `Updated: ${result.updated}`,
       ];
+      if (result.biddersLinked) {
+        summary.push(`Bidders linked: ${result.biddersLinked}`);
+      }
       if (result.warnings?.length) {
         summary.push(`Warnings: ${result.warnings.length}`);
       }

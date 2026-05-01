@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { property, user as userTable } from "@/lib/schema";
+import { property, propertyLinkedBidders, user as userTable } from "@/lib/schema";
 import { v4 as uuidv4 } from "uuid";
 import { eq, and } from "drizzle-orm";
 import {
@@ -94,11 +94,44 @@ export async function POST(req: Request) {
 
     let inserted = 0;
     let updated = 0;
+    let biddersLinked = 0;
     const warnings: { row: number; message: string }[] = [];
     const fatalRowErrors: { row: number; message: string }[] = parseErrors.map((e) => ({
       row: e.index + 2,
       message: e.message,
     }));
+
+    function resolveLinkStatus(propertyStatus: string): "won" | "bidding" | "invited" {
+      if (["sold", "sold_at_tax_sale", "deed_in_progress", "deed_issued", "redeemed", "redeemed_check_issued"].includes(propertyStatus)) {
+        return "won";
+      }
+      if (propertyStatus === "active") return "bidding";
+      return "invited"; // on_list, withdrawn, voided, cancelled
+    }
+
+    async function upsertLinkedBidder(propertyId: string, bidderId: string, propertyStatus: string) {
+      const linkStatus = resolveLinkStatus(propertyStatus);
+      const existing = await db
+        .select({ id: propertyLinkedBidders.id })
+        .from(propertyLinkedBidders)
+        .where(and(eq(propertyLinkedBidders.propertyId, propertyId), eq(propertyLinkedBidders.bidderId, bidderId)))
+        .limit(1);
+      if (existing.length > 0) {
+        await db
+          .update(propertyLinkedBidders)
+          .set({ status: linkStatus, linkedAt: new Date() })
+          .where(eq(propertyLinkedBidders.id, existing[0].id));
+      } else {
+        await db.insert(propertyLinkedBidders).values({
+          id: uuidv4(),
+          propertyId,
+          bidderId,
+          status: linkStatus,
+          linkedAt: new Date(),
+        });
+      }
+      biddersLinked++;
+    }
 
     for (const entry of okRows) {
       const sheetRow = entry.index + 2;
@@ -163,9 +196,13 @@ export async function POST(req: Request) {
           })
           .where(eq(property.id, existingId));
         updated++;
+        if (winningBidderId) {
+          await upsertLinkedBidder(existingId, winningBidderId, row.status);
+        }
       } else {
+        const newPropertyId = uuidv4();
         await db.insert(property).values({
-          id: uuidv4(),
+          id: newPropertyId,
           title: row.title,
           address: row.address ?? null,
           city: row.city ?? null,
@@ -185,12 +222,16 @@ export async function POST(req: Request) {
           visibilitySettings: defaultVisibility,
         });
         inserted++;
+        if (winningBidderId) {
+          await upsertLinkedBidder(newPropertyId, winningBidderId, row.status);
+        }
       }
     }
 
     return NextResponse.json({
       inserted,
       updated,
+      biddersLinked,
       errors: fatalRowErrors,
       warnings,
       statusOnly,
