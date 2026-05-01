@@ -341,6 +341,9 @@ export default function UsersList() {
                   <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('type')}>
                     <div className="flex items-center">Type {getSortIcon('type')}</div>
                   </TableHead>
+                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('bidderNumber')}>
+                    <div className="flex items-center">Bidder # {getSortIcon('bidderNumber')}</div>
+                  </TableHead>
                   <TableHead className="py-2 px-3">Phone</TableHead>
                   <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('createdAt')}>
                     <div className="flex items-center">Created {getSortIcon('createdAt')}</div>
@@ -359,6 +362,7 @@ export default function UsersList() {
                           {user.type || 'bidder'}
                         </Badge>
                       </TableCell>
+                      <TableCell className="py-1.5 px-3 font-mono text-xs">{user.bidderNumber || '—'}</TableCell>
                       <TableCell className="py-1.5 px-3">{formatPhone(user.phone)}</TableCell>
                       <TableCell className="whitespace-nowrap py-1.5 px-3">{new Date(user.createdAt).toLocaleString()}</TableCell>
                       <TableCell className="text-right py-1.5 px-3">
@@ -421,7 +425,7 @@ export default function UsersList() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       No users found
                     </TableCell>
                   </TableRow>

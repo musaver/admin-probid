@@ -55,21 +55,52 @@ export async function GET(request: Request) {
   }
 }
 
+async function generateUniqueBidderNumber(): Promise<string> {
+  for (let i = 0; i < 10; i++) {
+    const candidate = `BID-${String(Math.floor(10000 + Math.random() * 90000))}`;
+    const existing = await db.select({ id: user.id }).from(user).where(eq(user.bidderNumber, candidate)).limit(1);
+    if (existing.length === 0) return candidate;
+  }
+  // Fallback: use timestamp-based number which is virtually guaranteed unique
+  return `BID-${Date.now().toString().slice(-6)}`;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const now = new Date();
 
+    const userType = body.type || 'bidder';
+
+    const emailExists = await db.select({ id: user.id }).from(user).where(eq(user.email, body.email)).limit(1);
+    if (emailExists.length > 0) {
+      return NextResponse.json({ error: `An account with the email "${body.email}" already exists.` }, { status: 409 });
+    }
+
+    let bidderNumber: string | null = null;
+    if (userType === 'bidder') {
+      if (body.bidderNumber) {
+        const existing = await db.select({ id: user.id }).from(user).where(eq(user.bidderNumber, body.bidderNumber)).limit(1);
+        if (existing.length > 0) {
+          return NextResponse.json({ error: `Bidder number "${body.bidderNumber}" is already assigned to another user.` }, { status: 409 });
+        }
+        bidderNumber = body.bidderNumber;
+      } else {
+        bidderNumber = await generateUniqueBidderNumber();
+      }
+    }
+
     const newUser = {
       id: uuidv4(),
       name: body.name || null,
       email: body.email,
-      type: body.type || 'bidder',
+      type: userType,
       phone: body.phone || null,
       country: body.country || null,
       city: body.city || null,
       state: body.state || null,
-      countyId: body.type === 'bidder' && body.countyId ? body.countyId : null,
+      countyId: userType === 'bidder' && body.countyId ? body.countyId : null,
+      bidderNumber,
       createdAt: now,
       updatedAt: now,
     };
@@ -77,8 +108,12 @@ export async function POST(request: Request) {
     await db.insert(user).values(newUser as any);
 
     return NextResponse.json(newUser, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating user:', error);
-    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
+    const msg = error?.message?.toLowerCase() || '';
+    if (msg.includes('unique') || msg.includes('duplicate') || msg.includes('already exists')) {
+      return NextResponse.json({ error: 'A user with this email or bidder number already exists.' }, { status: 409 });
+    }
+    return NextResponse.json({ error: 'Failed to create user. Please try again.' }, { status: 500 });
   }
 }

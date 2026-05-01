@@ -26,6 +26,7 @@ export default function AddUser() {
     city: '',
     state: '',
     countyId: '',
+    bidderNumber: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -35,12 +36,10 @@ export default function AddUser() {
   useEffect(() => {
     const fetchCountyUsers = async () => {
       try {
-        const res = await fetch('/api/users');
+        const res = await fetch('/api/users?type=county&pageSize=all');
         const data = await res.json();
         setCountyUsers(
-          data
-            .filter((u: any) => u.type === 'county')
-            .map((u: any) => ({ id: u.id, name: u.name, email: u.email }))
+          (data.users || []).map((u: any) => ({ id: u.id, name: u.name, email: u.email }))
         );
       } catch (err) {
         console.error('Error fetching county users:', err);
@@ -125,6 +124,19 @@ export default function AddUser() {
                 </SelectContent>
               </Select>
             </div>
+
+            {formData.type === 'bidder' && (
+              <div className="space-y-2">
+                <Label htmlFor="bidderNumber">Bidder Number</Label>
+                <Input
+                  id="bidderNumber"
+                  name="bidderNumber"
+                  value={formData.bidderNumber}
+                  onChange={handleChange}
+                  placeholder="Auto-generated if left blank"
+                />
+              </div>
+            )}
 
             {formData.type === 'bidder' && (
               <div className="space-y-2">

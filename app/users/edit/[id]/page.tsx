@@ -30,6 +30,7 @@ export default function EditUser() {
     city: '',
     state: '',
     countyId: '',
+    bidderNumber: '',
   });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +43,7 @@ export default function EditUser() {
       try {
         const [userRes, allUsersRes] = await Promise.all([
           fetch(`/api/users/${userId}`),
-          fetch('/api/users'),
+          fetch('/api/users?type=county&pageSize=all'),
         ]);
 
         if (!userRes.ok) throw new Error('Failed to fetch user');
@@ -57,12 +58,13 @@ export default function EditUser() {
           city: userData.city || '',
           state: userData.state || '',
           countyId: userData.countyId || '',
+          bidderNumber: userData.bidderNumber || '',
         });
 
-        const allUsers = await allUsersRes.json();
+        const allUsersData = await allUsersRes.json();
         setCountyUsers(
-          allUsers
-            .filter((u: any) => u.type === 'county' && u.id !== userId)
+          (allUsersData.users || [])
+            .filter((u: any) => u.id !== userId)
             .map((u: any) => ({ id: u.id, name: u.name, email: u.email }))
         );
       } catch (err: any) {
@@ -164,6 +166,19 @@ export default function EditUser() {
                 </SelectContent>
               </Select>
             </div>
+
+            {formData.type === 'bidder' && (
+              <div className="space-y-2">
+                <Label htmlFor="bidderNumber">Bidder Number</Label>
+                <Input
+                  id="bidderNumber"
+                  name="bidderNumber"
+                  value={formData.bidderNumber}
+                  onChange={handleChange}
+                  placeholder="e.g. BID-12345"
+                />
+              </div>
+            )}
 
             {formData.type === 'bidder' && (
               <div className="space-y-2">
