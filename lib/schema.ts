@@ -282,3 +282,71 @@ export const adminLogs = mysqlTable("admin_logs", {
   details: text("details"),
   createdAt: datetime("createdAt").notNull(),
 });
+
+// ============================================================================
+// 🔄 Bidirectional sync with OwnMidwest (data.ownmidwest.com)
+// See BIDIRECTIONAL_SYNC_PROPOSAL.md. These four tables hold sync MACHINERY
+// state (queues, dedupe, id mapping) — not property data.
+// Keep identical to probid/src/lib/schema.ts (shared DB).
+// ============================================================================
+
+// Direction A: outbound queue of changes to push TO OwnMidwest
+export const syncOutbox = mysqlTable('sync_outbox', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  aggregateType: varchar('aggregate_type', { length: 32 }).notNull(), // tax_sale | owner | address | status
+  aggregateId: varchar('aggregate_id', { length: 255 }).notNull(),    // property.id
+  operation: varchar('operation', { length: 40 }).notNull(),          // add_tax_sale | update_tax_sale | update_status | update_owner | update_address
+  payload: json('payload').notNull(),                                 // body already mapped to OwnMidwest field names
+  idempotencyKey: varchar('idempotency_key', { length: 255 }).notNull().unique(),
+  contentHash: varchar('content_hash', { length: 64 }).notNull(),
+  status: mysqlEnum('status', ['pending', 'in_flight', 'delivered', 'dead']).default('pending').notNull(),
+  attempts: int('attempts').default(0).notNull(),
+  nextAttemptAt: datetime('next_attempt_at').notNull(),
+  lockedAt: datetime('locked_at'),
+  lastError: text('last_error'),
+  createdAt: datetime('created_at').notNull(),
+  deliveredAt: datetime('delivered_at'),
+}, (table) => ({
+  dueIdx: index('sync_outbox_due_idx').on(table.status, table.nextAttemptAt),
+  aggregateIdx: index('sync_outbox_aggregate_idx').on(table.aggregateId),
+}));
+
+// Direction B: dedupe log of events received FROM OwnMidwest
+export const syncInbox = mysqlTable('sync_inbox', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  eventId: varchar('event_id', { length: 255 }).notNull().unique(), // = X-Idempotency-Key
+  operation: varchar('operation', { length: 40 }).notNull(),
+  mapId: varchar('map_id', { length: 255 }),
+  countyId: int('county_id'),
+  status: mysqlEnum('status', ['processed', 'duplicate', 'unmatched', 'failed']).notNull(),
+  payload: json('payload'),
+  result: text('result'),
+  receivedAt: datetime('received_at').notNull(),
+}, (table) => ({
+  receivedIdx: index('sync_inbox_received_idx').on(table.receivedAt),
+}));
+
+// Identity mapping + echo-suppression hashes (one row per synced property)
+export const syncStatusMap = mysqlTable('sync_status_map', {
+  propertyId: varchar('property_id', { length: 255 }).primaryKey(), // FK -> property.id
+  omMapId: varchar('om_map_id', { length: 255 }).notNull(),
+  omCountyId: int('om_county_id').notNull(),
+  omExists: int('om_exists').default(0).notNull(),                  // 0/1: has AddTaxSale succeeded yet?
+  lastOutboundHash: varchar('last_outbound_hash', { length: 64 }),
+  lastInboundHash: varchar('last_inbound_hash', { length: 64 }),
+  lastSyncedAt: datetime('last_synced_at'),
+}, (table) => ({
+  omKeyIdx: index('sync_map_om_key_idx').on(table.omMapId, table.omCountyId),
+}));
+
+// Lookup mapping seeded from GetAllCounty / GetAllTaxSalesStatus / GetAllCompetitorStatus
+export const syncLookup = mysqlTable('sync_lookup', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  kind: mysqlEnum('kind', ['county', 'tax_status', 'competitor_status']).notNull(),
+  omId: int('om_id').notNull(),                          // the integer id on OwnMidwest
+  omName: varchar('om_name', { length: 255 }),
+  bbValue: varchar('bb_value', { length: 64 }),          // BidBridge enum value / county id it maps to
+  updatedAt: datetime('updated_at').notNull(),
+}, (table) => ({
+  kindIdx: index('sync_lookup_kind_idx').on(table.kind, table.omId),
+}));
