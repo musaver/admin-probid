@@ -15,6 +15,7 @@ import {
   KeyRound,
   ClipboardList,
   ClipboardCheck,
+  Activity,
   LogOut,
   MessageSquare,
   type LucideIcon,
@@ -35,6 +36,7 @@ const navigation: NavItem[] = [
   { name: 'Admin Users', href: '/admins',      icon: ShieldCheck },
   { name: 'Admin Roles', href: '/roles',       icon: KeyRound },
   { name: 'Admin Logs',  href: '/logs',        icon: ClipboardList },
+  { name: 'Activity',    href: '/activity',    icon: Activity },
   { name: 'Logout',      href: '/logout',      icon: LogOut },
 ];
 

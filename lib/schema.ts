@@ -318,6 +318,22 @@ export const adminLogs = mysqlTable("admin_logs", {
   createdAt: datetime("createdAt").notNull(),
 });
 
+// ✅ User Activity Log (bidder/county activity — logins etc. — retained on BidBridge only)
+export const userActivityLog = mysqlTable('user_activity_log', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  userId: varchar('user_id', { length: 255 }).notNull(), // FK to user.id
+  eventType: mysqlEnum('event_type', [
+    'login', 'logout', 'bid_submitted', 'suggestion_submitted', 'profile_updated', 'property_viewed',
+  ]).notNull(),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  metadata: json('metadata'),
+  createdAt: datetime('created_at').notNull(),
+}, (table) => ({
+  userIdx: index('ual_user_idx').on(table.userId, table.createdAt),
+  eventIdx: index('ual_event_idx').on(table.eventType, table.createdAt),
+}));
+
 // ============================================================================
 // 🔄 Bidirectional sync with OwnMidwest (data.ownmidwest.com)
 // See BIDIRECTIONAL_SYNC_PROPOSAL.md. These four tables hold sync MACHINERY

@@ -79,16 +79,23 @@ export default function RolesList() {
                   roles.map((role: any) => (
                     <TableRow key={role.id}>
                       <TableCell className="font-medium">{role.name}</TableCell>
-                      <TableCell className="max-w-md">
-                        <span className="text-sm text-muted-foreground">
-                          {role.permissions && typeof role.permissions === 'string'
-                            ? JSON.parse(role.permissions).join(', ')
-                            : Array.isArray(role.permissions)
-                              ? role.permissions.join(', ')
-                              : 'None'}
-                        </span>
+                      <TableCell className="align-top">
+                        <div className="text-sm text-muted-foreground max-w-md break-words whitespace-normal">
+                          {(() => {
+                            let perms: unknown = role.permissions;
+                            if (typeof perms === 'string') {
+                              try { perms = JSON.parse(perms); } catch { /* keep raw string */ }
+                            }
+                            if (Array.isArray(perms)) return perms.length ? perms.join(', ') : 'None';
+                            if (perms && typeof perms === 'object') {
+                              const keys = Object.keys(perms as Record<string, unknown>);
+                              return keys.length ? keys.join(', ') : 'None';
+                            }
+                            return perms ? String(perms) : 'None';
+                          })()}
+                        </div>
                       </TableCell>
-                      <TableCell>{new Date(role.createdAt).toLocaleString()}</TableCell>
+                      <TableCell className="align-middle whitespace-nowrap">{new Date(role.createdAt).toLocaleString()}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           <Button variant="outline" size="sm" asChild>

@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse, after } from 'next/server';
+import { getServerSession } from 'next-auth';
 import { db } from '@/lib/db';
-import { property, user } from '@/lib/schema';
+import { property, user, notifications, propertyLinkedBidders } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { v4 as uuidv4 } from 'uuid';
+import { authOptions } from '@/lib/auth';
 import { enqueuePropertyToOwnMidwest } from '@/lib/sync/enqueue';
 import { drainOutbox } from '@/lib/sync/drain';
+
+// The fields whose direct admin edits should trigger the "recently changed" highlight + notify.
+const TRACKED_FIELDS = ['parcelId', 'saleId', 'minBid', 'winningBid', 'status', 'address', 'owners', 'auctionEnd'];
+const normVal = (v: unknown): string =>
+  v == null ? '' : v instanceof Date ? new Date(v).toISOString() : typeof v === 'object' ? JSON.stringify(v) : String(v);
 
 export async function GET(
   req: NextRequest,
@@ -38,6 +46,22 @@ export async function PUT(
 
     data.updatedAt = new Date();
 
+    // Diff against the current row to find which tracked fields actually changed,
+    // so the admin's direct edit drives the recently-changed highlight + notifications.
+    const [current] = await db.select().from(property).where(eq(property.id, id)).limit(1);
+    const changedFields = current
+      ? TRACKED_FIELDS.filter((f) => f in data && normVal(data[f]) !== normVal((current as Record<string, unknown>)[f]))
+      : [];
+
+    if (changedFields.length > 0) {
+      const session = await getServerSession(authOptions);
+      const adminId = (session?.user as { id?: string } | undefined)?.id ?? null;
+      const prev = Array.isArray(current?.lastChangedFields) ? (current!.lastChangedFields as string[]) : [];
+      data.lastChangedFields = Array.from(new Set([...prev, ...changedFields]));
+      data.lastChangedAt = new Date();
+      data.lastChangedBy = adminId;
+    }
+
     await db
       .update(property)
       .set(data)
@@ -59,6 +83,32 @@ export async function PUT(
 
     if (!updated || updated.length === 0) {
       return NextResponse.json({ error: 'Property not found' }, { status: 404 });
+    }
+
+    // Notify all linked bidders that the admin changed this property.
+    if (changedFields.length > 0) {
+      try {
+        const linked = await db
+          .select({ bidderId: propertyLinkedBidders.bidderId })
+          .from(propertyLinkedBidders)
+          .where(eq(propertyLinkedBidders.propertyId, id));
+        const now = new Date();
+        for (const l of linked) {
+          await db.insert(notifications).values({
+            id: uuidv4(),
+            userId: l.bidderId,
+            type: 'status',
+            title: 'Property updated',
+            message: `A property you're linked to was updated (${changedFields.join(', ')}).`,
+            href: `/property-details/${id}`,
+            metadata: { propertyId: id, fields: changedFields },
+            isRead: 0,
+            createdAt: now,
+          });
+        }
+      } catch (e) {
+        console.error('[admin-edit] notify linked bidders failed:', e);
+      }
     }
 
     // Queue this change to be pushed to OwnMidwest (reverse sync), then deliver it
