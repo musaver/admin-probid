@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   KeyRound,
   ClipboardList,
+  ClipboardCheck,
   LogOut,
   MessageSquare,
   type LucideIcon,
@@ -28,6 +29,7 @@ interface NavItem {
 const navigation: NavItem[] = [
   { name: 'Dashboard',   href: '/',            icon: LayoutDashboard },
   { name: 'Properties',  href: '/properties',  icon: Building2 },
+  { name: 'Review',      href: '/review',      icon: ClipboardCheck },
   { name: 'Users',       href: '/users',       icon: Users },
   { name: 'Messaging',   href: '/messaging',   icon: MessageSquare },
   { name: 'Admin Users', href: '/admins',      icon: ShieldCheck },
