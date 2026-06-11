@@ -118,10 +118,45 @@ export const property = mysqlTable('property', {
     'deed_issued',
     'redeemed_check_issued',
   ]).default('active'),
+  // County-only workflow status. Set by the county, shown to bidders. NOT synced to
+  // OwnMidwest (kept off the sync mapping deliberately). null = not set.
+  countyStatus: mysqlEnum('county_status', [
+    'redemption_letter_sent',
+    'processing_check',
+    'redemption_check_sent',
+    'processing_tax_deed',
+    'sale_item_cancelled',
+  ]),
+  // Recently-changed highlight: set when admin approves a change or edits directly.
+  lastChangedAt: datetime('last_changed_at'),
+  lastChangedFields: json('last_changed_fields'), // e.g. ["minBid","status"]
+  lastChangedBy: varchar('last_changed_by', { length: 255 }), // admin user id
   createdBy: varchar('created_by', { length: 255 }).notNull(), // FK to user.id
   createdAt: datetime('created_at').notNull(),
   updatedAt: datetime('updated_at').notNull(),
 });
+
+// ✅ Property Change Requests (bidder/county request a change to one of the 10 data fields;
+// admin approves/rejects in the Review Center). One row = one field change.
+export const propertyChangeRequests = mysqlTable('property_change_requests', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  propertyId: varchar('property_id', { length: 255 }).notNull(),       // FK -> property.id
+  requestedByUserId: varchar('requested_by_user_id', { length: 255 }).notNull(), // FK -> user.id
+  requestedByRole: mysqlEnum('requested_by_role', ['bidder', 'county']).notNull(),
+  fieldName: varchar('field_name', { length: 64 }).notNull(),          // 'minBid' | 'taxSaleDate' | ...
+  oldValue: text('old_value'),                                         // snapshot at request time
+  newValue: text('new_value').notNull(),
+  reason: text('reason'),                                              // free-text justification
+  status: mysqlEnum('status', ['pending', 'approved', 'rejected']).default('pending').notNull(),
+  reviewedByAdminId: varchar('reviewed_by_admin_id', { length: 255 }),
+  reviewedAt: datetime('reviewed_at'),
+  reviewNote: text('review_note'),
+  createdAt: datetime('created_at').notNull(),
+}, (table) => ({
+  statusIdx: index('pcr_status_idx').on(table.status, table.createdAt),
+  propertyIdx: index('pcr_property_idx').on(table.propertyId),
+  requesterIdx: index('pcr_requester_idx').on(table.requestedByUserId),
+}));
 
 // ✅ Property Bids table (real bidding)
 export const propertyBids = mysqlTable(

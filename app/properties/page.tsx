@@ -432,143 +432,160 @@ export default function PropertiesList() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : (
-            <Table className="text-xs">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('title')}>
-                    <div className="flex items-center whitespace-nowrap">Title {getSortIcon('title')}</div>
-                  </TableHead>
-                  <TableHead className="py-2 px-3">Address</TableHead>
-                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('status')}>
-                    <div className="flex items-center whitespace-nowrap">Status {getSortIcon('status')}</div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('minBid')}>
-                    <div className="flex items-center whitespace-nowrap">Min Bid {getSortIcon('minBid')}</div>
-                  </TableHead>
-                  <TableHead className="py-2 px-3">County</TableHead>
-                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('bidders')}>
-                    <div className="flex items-center whitespace-nowrap">Bidders {getSortIcon('bidders')}</div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('createdAt')}>
-                    <div className="flex items-center whitespace-nowrap">Created At {getSortIcon('createdAt')}</div>
-                  </TableHead>
-                  <TableHead className="text-right py-2 px-3">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {properties.length > 0 ? (
-                  properties.map((row) => (
-                    <TableRow key={row.property.id}>
-                      <TableCell className="font-medium max-w-[160px] truncate py-1.5 px-3">{row.property.title}</TableCell>
-                      <TableCell className="max-w-[140px] truncate py-1.5 px-3">{row.property.address || '—'}</TableCell>
-                      <TableCell className="py-1 px-3">
-                        <Select
-                          value={row.property.status}
-                          onValueChange={(val) => handleInlineStatusChange(row, val)}
-                          disabled={updatingStatusId === row.property.id}
-                        >
-                          <SelectTrigger className="h-7 text-xs w-[155px] px-2">
-                            {updatingStatusId === row.property.id
-                              ? <Loader2 className="h-3 w-3 animate-spin" />
-                              : <SelectValue />}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PROPERTY_STATUSES.map((s) => (
-                              <SelectItem key={s} value={s} className="text-xs">{formatStatus(s)}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="py-1.5 px-3">{row.property.minBid ? `$${Number(row.property.minBid).toLocaleString()}` : '—'}</TableCell>
-                      <TableCell className="py-1.5 px-3">{row.creator?.name || row.creator?.email || '—'}</TableCell>
-                      <TableCell className="py-1.5 px-3">
-                        {row.linkedBiddersCount > 0 ? (
-                          <Badge
-                            variant="secondary"
-                            className="cursor-pointer hover:bg-primary/20 transition-colors text-xs"
-                            onClick={() => openBiddersDialog(row)}
-                          >
-                            <Users className="mr-1 h-3 w-3" />
-                            {row.linkedBiddersCount}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">0</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap py-1.5 px-3">{new Date(row.property.createdAt).toLocaleString()}</TableCell>
-                      <TableCell className="text-right py-1.5 px-3">
-                        <TooltipProvider delayDuration={200}>
-                        <div className="flex gap-1 justify-end whitespace-nowrap">
-                          {row.linkedBiddersCount > 0 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => openAlertDialog(row)}>
-                                  <Mail className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Send Alert</TooltipContent>
-                            </Tooltip>
-                          )}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" asChild>
-                                <Link href={`/properties/edit/${row.property.id}`}>
-                                  <Pencil className="h-3 w-3" />
-                                </Link>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Edit Property</TooltipContent>
-                          </Tooltip>
-                          <AlertDialog>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="destructive" size="sm" className="h-7 px-2 text-xs">
-                                    <Trash2 className="h-3 w-3" />
+      {loading ? (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </CardContent>
+        </Card>
+      ) : properties.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">No properties found</CardContent>
+        </Card>
+      ) : (
+        // One box per county (client wants counties separated out, not just a column).
+        <div className="space-y-6">
+          {Array.from(
+            properties.reduce((map, row) => {
+              const id = row.creator?.id || 'none';
+              if (!map.has(id)) {
+                map.set(id, { countyName: row.creator?.name || row.creator?.email || 'Unassigned County', rows: [] as PropertyRow[] });
+              }
+              map.get(id)!.rows.push(row);
+              return map;
+            }, new Map<string, { countyName: string; rows: PropertyRow[] }>())
+          )
+            .sort((a, b) => a[1].countyName.localeCompare(b[1].countyName))
+            .map(([countyId, group]) => (
+              <Card key={countyId}>
+                <CardContent className="p-0">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold">{group.countyName}</h3>
+                    <Badge variant="secondary" className="text-xs">{group.rows.length}</Badge>
+                  </div>
+                  <Table className="text-xs">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('title')}>
+                          <div className="flex items-center whitespace-nowrap">Title {getSortIcon('title')}</div>
+                        </TableHead>
+                        <TableHead className="py-2 px-3">Address</TableHead>
+                        <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('status')}>
+                          <div className="flex items-center whitespace-nowrap">Status {getSortIcon('status')}</div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('minBid')}>
+                          <div className="flex items-center whitespace-nowrap">Min Bid {getSortIcon('minBid')}</div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('bidders')}>
+                          <div className="flex items-center whitespace-nowrap">Bidders {getSortIcon('bidders')}</div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('createdAt')}>
+                          <div className="flex items-center whitespace-nowrap">Created At {getSortIcon('createdAt')}</div>
+                        </TableHead>
+                        <TableHead className="text-right py-2 px-3">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {group.rows.map((row) => (
+                        <TableRow key={row.property.id}>
+                          <TableCell className="font-medium max-w-[160px] truncate py-1.5 px-3">{row.property.title}</TableCell>
+                          <TableCell className="max-w-[140px] truncate py-1.5 px-3">{row.property.address || '—'}</TableCell>
+                          <TableCell className="py-1 px-3">
+                            <Select
+                              value={row.property.status}
+                              onValueChange={(val) => handleInlineStatusChange(row, val)}
+                              disabled={updatingStatusId === row.property.id}
+                            >
+                              <SelectTrigger className="h-7 text-xs w-[155px] px-2">
+                                {updatingStatusId === row.property.id
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : <SelectValue />}
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PROPERTY_STATUSES.map((s) => (
+                                  <SelectItem key={s} value={s} className="text-xs">{formatStatus(s)}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="py-1.5 px-3">{row.property.minBid ? `$${Number(row.property.minBid).toLocaleString()}` : '—'}</TableCell>
+                          <TableCell className="py-1.5 px-3">
+                            {row.linkedBiddersCount > 0 ? (
+                              <Badge
+                                variant="secondary"
+                                className="cursor-pointer hover:bg-primary/20 transition-colors text-xs"
+                                onClick={() => openBiddersDialog(row)}
+                              >
+                                <Users className="mr-1 h-3 w-3" />
+                                {row.linkedBiddersCount}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap py-1.5 px-3">{new Date(row.property.createdAt).toLocaleString()}</TableCell>
+                          <TableCell className="text-right py-1.5 px-3">
+                            <TooltipProvider delayDuration={200}>
+                            <div className="flex gap-1 justify-end whitespace-nowrap">
+                              {row.linkedBiddersCount > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => openAlertDialog(row)}>
+                                      <Mail className="h-3 w-3" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Send Alert</TooltipContent>
+                                </Tooltip>
+                              )}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs" asChild>
+                                    <Link href={`/properties/edit/${row.property.id}`}>
+                                      <Pencil className="h-3 w-3" />
+                                    </Link>
                                   </Button>
-                                </AlertDialogTrigger>
-                              </TooltipTrigger>
-                              <TooltipContent>Delete Property</TooltipContent>
-                            </Tooltip>
-                            <AlertDialogContent className="sm:max-w-md">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Property</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this property? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(row.property.id)}>Delete</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                        </TooltipProvider>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                      No properties found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                                </TooltipTrigger>
+                                <TooltipContent>Edit Property</TooltipContent>
+                              </Tooltip>
+                              <AlertDialog>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="destructive" size="sm" className="h-7 px-2 text-xs">
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Delete Property</TooltipContent>
+                                </Tooltip>
+                                <AlertDialogContent className="sm:max-w-md">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Property</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this property? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(row.property.id)}>Delete</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                            </TooltipProvider>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            ))}
+        </div>
+      )}
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-2">

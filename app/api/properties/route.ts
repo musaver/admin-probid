@@ -100,6 +100,7 @@ export async function POST(request: Request) {
       winningBidderId: body.winningBidderId || null,
       visibilitySettings: body.visibilitySettings || null,
       status: body.status || 'active',
+      countyStatus: body.countyStatus || null, // county-only workflow status (not synced)
       createdBy: body.createdBy,
       createdAt: now,
       updatedAt: now,
