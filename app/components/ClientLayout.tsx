@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -40,12 +40,13 @@ const navigation: NavItem[] = [
   { name: 'Logout',      href: '/logout',      icon: LogOut },
 ];
 
-function NavItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function NavItems({ pathname, onNavigate, badges }: { pathname: string; onNavigate?: () => void; badges?: Record<string, number> }) {
   return (
     <nav className="flex-1 space-y-1 p-4">
       {navigation.map((item) => {
         const isActive = pathname === item.href;
         const Icon = item.icon;
+        const count = badges?.[item.href] ?? 0;
         return (
           <Button
             key={item.name}
@@ -53,9 +54,14 @@ function NavItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
             className={`w-full justify-start text-base ${isActive ? 'bg-primary/10 text-primary font-medium' : ''}`}
             asChild
           >
-            <Link href={item.href} onClick={onNavigate}>
+            <Link href={item.href} onClick={onNavigate} className="flex items-center w-full">
               <Icon className="mr-3 h-4 w-4 shrink-0" />
-              {item.name}
+              <span className="flex-1 text-left">{item.name}</span>
+              {count > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-600 text-white text-xs font-semibold h-5 min-w-[20px] px-1.5">
+                  {count > 99 ? '99+' : count}
+                </span>
+              )}
             </Link>
           </Button>
         );
@@ -70,6 +76,25 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const { data: session, status } = useSession();
 
   const isAuthPage = pathname === '/login' || pathname === '/logout';
+
+  const [reviewCount, setReviewCount] = useState(0);
+  useEffect(() => {
+    if (!session || isAuthPage) return;
+    let active = true;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/change-requests?status=pending');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active) setReviewCount(Array.isArray(data.requests) ? data.requests.length : 0);
+      } catch { /* ignore */ }
+    };
+    load();
+    const t = setInterval(load, 60000); // refresh the badge every minute
+    return () => { active = false; clearInterval(t); };
+  }, [session, isAuthPage, pathname]);
+
+  const navBadges = { '/review': reviewCount };
 
   if (status === 'loading') return null;
   if (!session || isAuthPage) return <div>{children}</div>;
@@ -90,7 +115,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               <h2 className="text-xl font-semibold">Admin Panel</h2>
             </div>
             <Separator />
-            <NavItems pathname={pathname} onNavigate={() => setOpen(false)} />
+            <NavItems pathname={pathname} onNavigate={() => setOpen(false)} badges={navBadges} />
           </SheetContent>
         </Sheet>
         <h1 className="ml-4 text-lg font-medium">Admin Panel</h1>
@@ -103,7 +128,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             <h2 className="text-xl font-semibold">Admin Panel</h2>
           </div>
           <Separator />
-          <NavItems pathname={pathname} />
+          <NavItems pathname={pathname} badges={navBadges} />
         </div>
       </div>
 
