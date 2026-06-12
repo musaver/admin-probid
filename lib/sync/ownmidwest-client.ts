@@ -48,21 +48,15 @@ async function authedPost(path: string, body: unknown): Promise<OmResult> {
       body: JSON.stringify(body),
     });
 
-  console.log(`[ownmidwest] POST ${path} — token length=${token?.length ?? 0}, prefix=${(token || '').slice(0, 12)}`);
   let res = await call(token);
-  let peek = await res.clone().text();
-  // Refresh + retry once on any token-related rejection. OwnMidwest signals an expired/bad
+  // Refresh + retry once on a token-related rejection. OwnMidwest signals an expired/bad
   // token as 400/401 "No Token Found!!!" OR as 500 "IDX10000 ... 'token' ... null".
-  const looksLikeTokenError =
-    (res.status === 400 || res.status === 401 || res.status === 500) &&
-    /no token|idx10000|parameter 'token'/i.test(peek);
-  if (looksLikeTokenError) {
-    console.warn(`[ownmidwest] POST ${path} token rejected (HTTP ${res.status}): ${peek.slice(0, 120)} — forcing fresh login + retry`);
-    token = await login();
-    console.log(`[ownmidwest] retry POST ${path} — fresh token length=${token?.length ?? 0}`);
-    res = await call(token);
-    peek = await res.text();
-    return { ok: res.ok, status: res.status, text: peek };
+  if (res.status === 400 || res.status === 401 || res.status === 500) {
+    const peek = await res.clone().text();
+    if (/no token|idx10000|parameter 'token'/i.test(peek)) {
+      token = await login();
+      res = await call(token);
+    }
   }
   const text = await res.text();
   return { ok: res.ok, status: res.status, text };

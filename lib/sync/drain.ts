@@ -39,19 +39,30 @@ async function deliver(row: OutboxRow): Promise<Outcome> {
 
   // Decide Add vs Update based on whether the record already exists on their side.
   const map = await db
-    .select({ omExists: syncStatusMap.omExists })
+    .select({ omExists: syncStatusMap.omExists, omSaleId: syncStatusMap.omSaleId })
     .from(syncStatusMap)
     .where(eq(syncStatusMap.propertyId, snap.id))
     .limit(1);
   const exists = (map[0]?.omExists ?? 0) === 1;
 
-  const res = exists ? await ownmidwest.updateTaxSale(built.body) : await ownmidwest.addTaxSale(built.body);
+  let res;
+  if (exists) {
+    // saleID is IMMUTABLE on OwnMidwest's UpdateTaxSale — it must match the value they
+    // already have. Send the stored om_sale_id (not the property's possibly-edited saleId)
+    // so a BidBridge Sale ID edit can never break the update.
+    const updateBody = map[0]?.omSaleId ? { ...built.body, saleID: map[0].omSaleId } : built.body;
+    res = await ownmidwest.updateTaxSale(updateBody);
+  } else {
+    res = await ownmidwest.addTaxSale(built.body);
+  }
 
   if (res.ok) {
     await db.update(syncOutbox).set({ status: 'delivered', deliveredAt: new Date(), lastError: null }).where(eq(syncOutbox.id, row.id));
+    // On a successful Add, capture the saleID we created the record with (it's now OM's immutable saleID).
+    const omSaleId = exists ? (map[0]?.omSaleId ?? null) : (built.body.saleID as string | undefined) ?? null;
     await db
       .update(syncStatusMap)
-      .set({ omExists: 1, lastOutboundHash: row.contentHash, lastSyncedAt: new Date() })
+      .set({ omExists: 1, omSaleId, lastOutboundHash: row.contentHash, lastSyncedAt: new Date() })
       .where(eq(syncStatusMap.propertyId, snap.id));
     return { id: row.id, status: 'delivered' };
   }

@@ -1,8 +1,6 @@
 // POST /api/sync/drain
 // Runs the outbox worker once (sends pending changes to OwnMidwest).
 // Protect with the SYNC_DRAIN_TOKEN header so only your cron / you can trigger it.
-//
-// In production, point a scheduled job (e.g. Vercel Cron) at this endpoint every minute.
 
 import { NextResponse } from 'next/server';
 import { drainOutbox } from '@/lib/sync/drain';

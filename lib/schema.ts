@@ -382,6 +382,7 @@ export const syncStatusMap = mysqlTable('sync_status_map', {
   propertyId: varchar('property_id', { length: 255 }).primaryKey(), // FK -> property.id
   omMapId: varchar('om_map_id', { length: 255 }).notNull(),
   omCountyId: int('om_county_id').notNull(),
+  omSaleId: varchar('om_sale_id', { length: 255 }),                 // OwnMidwest's saleID (immutable on their side); sent on UpdateTaxSale
   omExists: int('om_exists').default(0).notNull(),                  // 0/1: has AddTaxSale succeeded yet?
   lastOutboundHash: varchar('last_outbound_hash', { length: 64 }),
   lastInboundHash: varchar('last_inbound_hash', { length: 64 }),
