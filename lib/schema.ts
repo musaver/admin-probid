@@ -323,7 +323,7 @@ export const userActivityLog = mysqlTable('user_activity_log', {
   id: varchar('id', { length: 255 }).primaryKey(),
   userId: varchar('user_id', { length: 255 }).notNull(), // FK to user.id
   eventType: mysqlEnum('event_type', [
-    'login', 'logout', 'bid_submitted', 'suggestion_submitted', 'profile_updated', 'property_viewed',
+    'login', 'logout', 'bid_submitted', 'suggestion_submitted', 'profile_updated', 'property_viewed', 'property_edited',
   ]).notNull(),
   ipAddress: varchar('ip_address', { length: 45 }),
   userAgent: text('user_agent'),

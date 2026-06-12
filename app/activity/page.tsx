@@ -55,6 +55,7 @@ export default function ActivityPage() {
             <SelectItem value="logout">Logout</SelectItem>
             <SelectItem value="bid_submitted">Bid submitted</SelectItem>
             <SelectItem value="suggestion_submitted">Suggestion submitted</SelectItem>
+            <SelectItem value="property_edited">Property edited (county)</SelectItem>
             <SelectItem value="profile_updated">Profile updated</SelectItem>
             <SelectItem value="property_viewed">Property viewed</SelectItem>
           </SelectContent>

@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const userId = sp.get('userId') || '';
 
   const filters = [];
-  if (eventType) filters.push(eq(userActivityLog.eventType, eventType as 'login' | 'logout' | 'bid_submitted' | 'suggestion_submitted' | 'profile_updated' | 'property_viewed'));
+  if (eventType) filters.push(eq(userActivityLog.eventType, eventType as 'login' | 'logout' | 'bid_submitted' | 'suggestion_submitted' | 'profile_updated' | 'property_viewed' | 'property_edited'));
   if (userId) filters.push(eq(userActivityLog.userId, userId));
 
   const rows = await db
