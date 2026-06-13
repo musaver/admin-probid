@@ -9,7 +9,7 @@ import { enqueuePropertyToOwnMidwest } from '@/lib/sync/enqueue';
 import { drainOutbox } from '@/lib/sync/drain';
 
 // The fields whose direct admin edits should trigger the "recently changed" highlight + notify.
-const TRACKED_FIELDS = ['parcelId', 'saleId', 'minBid', 'winningBid', 'status', 'address', 'owners', 'auctionEnd'];
+const TRACKED_FIELDS = ['parcelId', 'saleId', 'minBid', 'winningBid', 'status', 'address', 'city', 'zipCode', 'owners', 'auctionEnd'];
 const normVal = (v: unknown): string =>
   v == null ? '' : v instanceof Date ? new Date(v).toISOString() : typeof v === 'object' ? JSON.stringify(v) : String(v);
 
@@ -117,12 +117,20 @@ export async function PUT(
     // NO cron. The outbox + idempotency key guarantee each change is sent exactly once.
     // origin defaults to 'local'; pass 'ownmidwest' only when applying an inbound change.
     try {
-      const { queued } = await enqueuePropertyToOwnMidwest(
-        updated[0].property as Record<string, unknown>,
-        'update_tax_sale',
-        data.__origin === 'ownmidwest' ? 'ownmidwest' : 'local',
-      );
-      if (queued) {
+      const propertyRow = updated[0].property as Record<string, unknown>;
+      const origin = data.__origin === 'ownmidwest' ? 'ownmidwest' : 'local';
+
+      // Always queue the tax-sale upsert (status/bids/dates/notes).
+      const { queued } = await enqueuePropertyToOwnMidwest(propertyRow, 'update_tax_sale', origin);
+
+      // Owner / address have their own OwnMidwest endpoints — queue them only when those
+      // fields actually changed.
+      const ownerChanged = changedFields.includes('owners');
+      const addressChanged = changedFields.some((f) => ['address', 'city', 'zipCode'].includes(f));
+      if (ownerChanged) await enqueuePropertyToOwnMidwest(propertyRow, 'update_owner', origin);
+      if (addressChanged) await enqueuePropertyToOwnMidwest(propertyRow, 'update_address', origin);
+
+      if (queued || ownerChanged || addressChanged) {
         after(async () => {
           try {
             await drainOutbox();

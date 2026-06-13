@@ -15,6 +15,10 @@ export type PropertySnapshot = {
   description: string | null;
   status: string | null;
   auctionEnd: string | Date | null;
+  owners: unknown;        // JSON array of owner names, or string
+  address: string | null;
+  city: string | null;
+  zipCode: string | null;
 };
 
 /** The OwnMidwest county id for a property (stored when it first synced FROM them). null if unknown. */
@@ -138,5 +142,63 @@ export function snapshotOf(p: Record<string, unknown>): PropertySnapshot {
     description: (p.description as string) ?? null,
     status: (p.status as string) ?? null,
     auctionEnd: (p.auctionEnd as string | Date) ?? null,
+    owners: p.owners ?? null,
+    address: (p.address as string) ?? null,
+    city: (p.city as string) ?? null,
+    zipCode: (p.zipCode as string) ?? null,
   };
+}
+
+/** First owner name from the snapshot's owners (JSON array or string). '' if none. */
+function firstOwnerName(owners: unknown): string {
+  if (Array.isArray(owners)) return owners.length ? String(owners[0]) : '';
+  if (typeof owners === 'string') {
+    try { const arr = JSON.parse(owners); return Array.isArray(arr) ? String(arr[0] ?? '') : owners; }
+    catch { return owners; }
+  }
+  return '';
+}
+
+/** Build the UpdatePropertyOwnerInfo body. OwnMidwest requires FullName, City, ZipCode. */
+export async function buildOwnerBody(p: PropertySnapshot): Promise<TaxSaleBuildResult> {
+  if (!p.parcelId) return { ok: false, reason: 'property has no parcelId (mapId)' };
+  const countyId = await resolveCountyId(p.id);
+  if (countyId == null) return { ok: false, reason: 'no county mapping (sync_status_map.om_county_id missing)' };
+
+  const fullName = firstOwnerName(p.owners);
+  if (!fullName) return { ok: false, reason: 'owner update needs an owner name (FullName required by OwnMidwest)' };
+  if (!p.city || !p.zipCode) return { ok: false, reason: 'owner update needs city + zipCode (required by OwnMidwest)' };
+
+  const parts = fullName.trim().split(/\s+/);
+  const body: Record<string, unknown> = {
+    mapId: p.parcelId,
+    countyIDFK: countyId,
+    fullName,
+    firstName: parts[0] ?? '',
+    lastName: parts.length > 1 ? parts.slice(1).join(' ') : '',
+    street: p.address ?? '',
+    city: p.city,
+    zipCode: p.zipCode,
+  };
+  return { ok: true, body };
+}
+
+/** Build the UpdatePropertyAddress body. OwnMidwest requires Location, City, ZipCode. */
+export async function buildAddressBody(p: PropertySnapshot): Promise<TaxSaleBuildResult> {
+  if (!p.parcelId) return { ok: false, reason: 'property has no parcelId (mapId)' };
+  const countyId = await resolveCountyId(p.id);
+  if (countyId == null) return { ok: false, reason: 'no county mapping (sync_status_map.om_county_id missing)' };
+  if (!p.city || !p.zipCode) return { ok: false, reason: 'address update needs city + zipCode (required by OwnMidwest)' };
+
+  // OwnMidwest requires a `location` (BidBridge has no separate field) — use the street address.
+  const streetAddress = p.address ?? '';
+  const body: Record<string, unknown> = {
+    mapId: p.parcelId,
+    countyIDFK: countyId,
+    location: streetAddress || p.city,
+    streetAddress,
+    city: p.city,
+    zipCode: p.zipCode,
+  };
+  return { ok: true, body };
 }

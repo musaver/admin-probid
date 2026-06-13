@@ -6,7 +6,7 @@ import { and, eq, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { syncOutbox, syncStatusMap } from '@/lib/schema';
 import { ownmidwest } from './ownmidwest-client';
-import { buildTaxSaleBody, type PropertySnapshot } from './mapping';
+import { buildTaxSaleBody, buildOwnerBody, buildAddressBody, type PropertySnapshot } from './mapping';
 
 const MAX_ATTEMPTS = 8;
 
@@ -28,8 +28,39 @@ async function reschedule(id: string, attempts: number, error: string): Promise<
     .where(eq(syncOutbox.id, id));
 }
 
+// Mark an outbox row delivered / dead / retry based on the OwnMidwest HTTP result.
+async function finishResult(row: OutboxRow, res: { ok: boolean; status: number; text: string }): Promise<Outcome> {
+  if (res.ok) {
+    await db.update(syncOutbox).set({ status: 'delivered', deliveredAt: new Date(), lastError: null }).where(eq(syncOutbox.id, row.id));
+    return { id: row.id, status: 'delivered' };
+  }
+  if (res.status === 400) {
+    await markDead(row.id, `HTTP 400: ${res.text}`);
+    return { id: row.id, status: 'dead', http: 400, reason: res.text };
+  }
+  if (row.attempts >= MAX_ATTEMPTS) {
+    await markDead(row.id, `gave up after ${row.attempts} attempts; last: HTTP ${res.status}`);
+    return { id: row.id, status: 'dead', http: res.status, reason: 'max attempts' };
+  }
+  await reschedule(row.id, row.attempts, `HTTP ${res.status}: ${res.text}`);
+  return { id: row.id, status: 'retry', http: res.status };
+}
+
 async function deliver(row: OutboxRow): Promise<Outcome> {
   const snap = row.payload as PropertySnapshot;
+
+  // Owner / address changes go to OwnMidwest's dedicated endpoints (not the tax-sale upsert).
+  if (row.operation === 'update_owner' || row.operation === 'update_address') {
+    const built = row.operation === 'update_owner' ? await buildOwnerBody(snap) : await buildAddressBody(snap);
+    if (!built.ok) {
+      await markDead(row.id, built.reason);
+      return { id: row.id, status: 'dead', reason: built.reason };
+    }
+    const res = row.operation === 'update_owner'
+      ? await ownmidwest.updateOwnerInfo(built.body)
+      : await ownmidwest.updateAddress(built.body);
+    return finishResult(row, res);
+  }
 
   const built = await buildTaxSaleBody(snap);
   if (!built.ok) {

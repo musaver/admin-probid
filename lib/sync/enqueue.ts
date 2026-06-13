@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 import { syncOutbox } from '@/lib/schema';
 import { snapshotOf, type PropertySnapshot } from './mapping';
 
-export type OutboxOperation = 'add_tax_sale' | 'update_tax_sale';
+export type OutboxOperation = 'add_tax_sale' | 'update_tax_sale' | 'update_owner' | 'update_address';
 
 function sha256(value: unknown): string {
   return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
