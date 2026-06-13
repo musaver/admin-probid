@@ -31,6 +31,24 @@ export async function resolveCountyId(propertyId: string): Promise<number | null
   return rows[0]?.omCountyId ?? null;
 }
 
+/**
+ * OwnMidwest's owner/address endpoints require a `state`. BidBridge has no state column,
+ * but the county name in sync_lookup carries it (e.g. "Greenville SC", "Dearborn IN").
+ * Extract the trailing 2-letter state code. null if not derivable.
+ */
+export async function resolveCountyState(propertyId: string): Promise<string | null> {
+  const cid = await resolveCountyId(propertyId);
+  if (cid == null) return null;
+  const rows = await db
+    .select({ omName: syncLookup.omName })
+    .from(syncLookup)
+    .where(and(eq(syncLookup.kind, 'county'), eq(syncLookup.omId, cid)))
+    .limit(1);
+  const name = (rows[0]?.omName ?? '').trim();
+  const m = name.match(/\b([A-Za-z]{2})$/); // trailing 2-letter state code
+  return m ? m[1].toUpperCase() : null;
+}
+
 /** The bidder number OwnMidwest expects in `bidderInfo`, taken from the winning bidder. null if none. */
 export async function resolveBidderNumber(winningBidderId: string | null): Promise<string | null> {
   if (!winningBidderId) return null;
@@ -169,6 +187,7 @@ export async function buildOwnerBody(p: PropertySnapshot): Promise<TaxSaleBuildR
   if (!fullName) return { ok: false, reason: 'owner update needs an owner name (FullName required by OwnMidwest)' };
   if (!p.city || !p.zipCode) return { ok: false, reason: 'owner update needs city + zipCode (required by OwnMidwest)' };
 
+  const state = (await resolveCountyState(p.id)) ?? '';
   const parts = fullName.trim().split(/\s+/);
   const body: Record<string, unknown> = {
     mapId: p.parcelId,
@@ -178,6 +197,7 @@ export async function buildOwnerBody(p: PropertySnapshot): Promise<TaxSaleBuildR
     lastName: parts.length > 1 ? parts.slice(1).join(' ') : '',
     street: p.address ?? '',
     city: p.city,
+    state,
     zipCode: p.zipCode,
   };
   return { ok: true, body };
@@ -191,13 +211,16 @@ export async function buildAddressBody(p: PropertySnapshot): Promise<TaxSaleBuil
   if (!p.city || !p.zipCode) return { ok: false, reason: 'address update needs city + zipCode (required by OwnMidwest)' };
 
   // OwnMidwest requires a `location` (BidBridge has no separate field) — use the street address.
+  // It also requires `state`, derived from the county name.
   const streetAddress = p.address ?? '';
+  const state = (await resolveCountyState(p.id)) ?? '';
   const body: Record<string, unknown> = {
     mapId: p.parcelId,
     countyIDFK: countyId,
     location: streetAddress || p.city,
     streetAddress,
     city: p.city,
+    state,
     zipCode: p.zipCode,
   };
   return { ok: true, body };

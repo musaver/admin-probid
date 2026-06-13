@@ -110,17 +110,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     createdAt: now,
   });
 
-  // 5. queue the change for OwnMidwest (reverse sync), delivered async after the response.
+  // 5. queue the change for OwnMidwest (reverse sync) — one operation matching the field
+  //    that was approved — delivered async after the response.
   try {
     const [updated] = await db.select().from(property).where(eq(property.id, cr.propertyId)).limit(1);
     const row = updated as Record<string, unknown>;
-    const { queued } = await enqueuePropertyToOwnMidwest(row, 'update_tax_sale', 'local');
-    // If the approved field was owner/address, also push to those dedicated endpoints.
-    if (cr.fieldName === 'owners') await enqueuePropertyToOwnMidwest(row, 'update_owner', 'local');
-    if (cr.fieldName === 'address') await enqueuePropertyToOwnMidwest(row, 'update_address', 'local');
-    if (queued || cr.fieldName === 'owners' || cr.fieldName === 'address') {
-      after(async () => { try { await drainOutbox(); } catch (e) { console.error('[review-approve] drain failed', e); } });
-    }
+    const op = cr.fieldName === 'owners' ? 'update_owner'
+      : ['address', 'city', 'zipCode'].includes(cr.fieldName) ? 'update_address'
+      : 'update_tax_sale';
+    await enqueuePropertyToOwnMidwest(row, op, 'local');
+    after(async () => { try { await drainOutbox(); } catch (e) { console.error('[review-approve] drain failed', e); } });
   } catch (e) {
     console.error('[review-approve] enqueue failed (change still applied):', e);
   }

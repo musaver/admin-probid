@@ -9,7 +9,11 @@ import { enqueuePropertyToOwnMidwest } from '@/lib/sync/enqueue';
 import { drainOutbox } from '@/lib/sync/drain';
 
 // The fields whose direct admin edits should trigger the "recently changed" highlight + notify.
-const TRACKED_FIELDS = ['parcelId', 'saleId', 'minBid', 'winningBid', 'status', 'address', 'city', 'zipCode', 'owners', 'auctionEnd'];
+// Which property fields map to each OwnMidwest sync operation.
+const TAX_SALE_FIELDS = ['parcelId', 'saleId', 'minBid', 'winningBid', 'status', 'auctionEnd', 'description', 'winningBidderId'];
+const OWNER_FIELDS = ['owners'];
+const ADDRESS_FIELDS = ['address', 'city', 'zipCode'];
+const TRACKED_FIELDS = [...TAX_SALE_FIELDS, ...OWNER_FIELDS, ...ADDRESS_FIELDS];
 const normVal = (v: unknown): string =>
   v == null ? '' : v instanceof Date ? new Date(v).toISOString() : typeof v === 'object' ? JSON.stringify(v) : String(v);
 
@@ -120,17 +124,17 @@ export async function PUT(
       const propertyRow = updated[0].property as Record<string, unknown>;
       const origin = data.__origin === 'ownmidwest' ? 'ownmidwest' : 'local';
 
-      // Always queue the tax-sale upsert (status/bids/dates/notes).
-      const { queued } = await enqueuePropertyToOwnMidwest(propertyRow, 'update_tax_sale', origin);
+      // Queue only the operations whose fields actually changed, so an address-only edit
+      // doesn't also fire a redundant tax-sale push (one row per real change).
+      const taxChanged = changedFields.some((f) => TAX_SALE_FIELDS.includes(f));
+      const ownerChanged = changedFields.some((f) => OWNER_FIELDS.includes(f));
+      const addressChanged = changedFields.some((f) => ADDRESS_FIELDS.includes(f));
 
-      // Owner / address have their own OwnMidwest endpoints — queue them only when those
-      // fields actually changed.
-      const ownerChanged = changedFields.includes('owners');
-      const addressChanged = changedFields.some((f) => ['address', 'city', 'zipCode'].includes(f));
+      if (taxChanged) await enqueuePropertyToOwnMidwest(propertyRow, 'update_tax_sale', origin);
       if (ownerChanged) await enqueuePropertyToOwnMidwest(propertyRow, 'update_owner', origin);
       if (addressChanged) await enqueuePropertyToOwnMidwest(propertyRow, 'update_address', origin);
 
-      if (queued || ownerChanged || addressChanged) {
+      if (taxChanged || ownerChanged || addressChanged) {
         after(async () => {
           try {
             await drainOutbox();
