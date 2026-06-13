@@ -41,6 +41,7 @@ export default function EditProperty() {
   const [lotSize, setLotSize] = useState('');
   const [minBid, setMinBid] = useState('');
   const [status, setStatus] = useState('active');
+  const [ownerName, setOwnerName] = useState('');
 
   useEffect(() => {
     const fetchProperty = async () => {
@@ -63,6 +64,14 @@ export default function EditProperty() {
         setLotSize(data.lotSize || '');
         setMinBid(data.minBid || '');
         setStatus(data.status || 'active');
+        // owners is a JSON array; show the primary (first) owner name.
+        let firstOwner = '';
+        const ow = data.owners;
+        if (Array.isArray(ow)) firstOwner = ow[0] ? String(ow[0]) : '';
+        else if (typeof ow === 'string') {
+          try { const a = JSON.parse(ow); firstOwner = Array.isArray(a) ? String(a[0] ?? '') : ow; } catch { firstOwner = ow; }
+        }
+        setOwnerName(firstOwner);
         setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load property');
@@ -94,6 +103,7 @@ export default function EditProperty() {
           lotSize: lotSize || null,
           minBid: minBid || null,
           status,
+          owners: ownerName.trim() ? [ownerName.trim()] : null,
         }),
       });
 
@@ -160,6 +170,11 @@ export default function EditProperty() {
             <div className="space-y-2">
               <Label htmlFor="address">Address</Label>
               <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ownerName">Owner Name</Label>
+              <Input id="ownerName" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Primary owner name" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
