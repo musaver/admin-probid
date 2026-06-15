@@ -104,6 +104,7 @@ export const property = mysqlTable('property', {
   minBid: decimal('min_bid', { precision: 12, scale: 2 }),
   winningBid: decimal('winning_bid', { precision: 12, scale: 2 }), // Manual override or record
   winningBidderId: varchar('winning_bidder_id', { length: 255 }), // Linked to user.id
+  winningBidderNumber: varchar('winning_bidder_number', { length: 50 }), // OwnMidwest bidder number for this property (from inbound bidderInfo); used to verify bidder claims
   visibilitySettings: json('visibility_settings'),
   status: mysqlEnum('status', [
     'active',
@@ -156,6 +157,35 @@ export const propertyChangeRequests = mysqlTable('property_change_requests', {
   statusIdx: index('pcr_status_idx').on(table.status, table.createdAt),
   propertyIdx: index('pcr_property_idx').on(table.propertyId),
   requesterIdx: index('pcr_requester_idx').on(table.requestedByUserId),
+}));
+
+// ✅ Bidder Claims — a bidder submits "I'm bidder #N in <county> and won these properties".
+// Admin verifies (auto-match + click). One claim per county submission.
+export const bidderClaim = mysqlTable('bidder_claim', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  bidderUserId: varchar('bidder_user_id', { length: 255 }).notNull(), // FK -> user.id
+  omCountyId: int('om_county_id').notNull(),                          // which county the claim is for
+  bidderNumber: varchar('bidder_number', { length: 10 }).notNull(),   // county-issued number (2–4 digits)
+  status: mysqlEnum('status', ['pending', 'verified', 'rejected']).default('pending').notNull(),
+  reviewedByAdminId: varchar('reviewed_by_admin_id', { length: 255 }),
+  reviewedAt: datetime('reviewed_at'),
+  note: text('note'),
+  createdAt: datetime('created_at').notNull(),
+}, (table) => ({
+  bidderIdx: index('bidder_claim_bidder_idx').on(table.bidderUserId),
+  statusIdx: index('bidder_claim_status_idx').on(table.status, table.createdAt),
+}));
+
+// ✅ Bidder Claim Items — the properties claimed in a submission (by Sale ID or Map Number).
+export const bidderClaimItem = mysqlTable('bidder_claim_item', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  claimId: varchar('claim_id', { length: 255 }).notNull(),           // FK -> bidder_claim.id
+  enteredValue: varchar('entered_value', { length: 255 }).notNull(), // SaleID or MapNumber as typed
+  resolvedPropertyId: varchar('resolved_property_id', { length: 255 }), // matched property.id, when found
+  matchStatus: mysqlEnum('match_status', ['matched', 'mismatch', 'not_found']).notNull(),
+  createdAt: datetime('created_at').notNull(),
+}, (table) => ({
+  claimIdx: index('bidder_claim_item_claim_idx').on(table.claimId),
 }));
 
 // ✅ Property Bids table (real bidding)
