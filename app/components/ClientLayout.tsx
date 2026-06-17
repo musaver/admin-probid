@@ -17,6 +17,7 @@ import {
   ClipboardCheck,
   UserCheck,
   Megaphone,
+  RefreshCw,
   Activity,
   LogOut,
   MessageSquare,
@@ -40,6 +41,7 @@ const navigation: NavItem[] = [
   { name: 'Admin Users', href: '/admins',      icon: ShieldCheck },
   { name: 'Admin Roles', href: '/roles',       icon: KeyRound },
   { name: 'Admin Logs',  href: '/logs',        icon: ClipboardList },
+  { name: 'Sync Status', href: '/sync-status', icon: RefreshCw },
   { name: 'Activity',    href: '/activity',    icon: Activity },
   { name: 'Logout',      href: '/logout',      icon: LogOut },
 ];
