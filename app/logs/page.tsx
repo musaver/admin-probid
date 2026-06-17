@@ -47,10 +47,12 @@ export default function AdminLogs() {
                 {logs.length > 0 ? (
                   logs.map((log: any) => (
                     <TableRow key={log.log.id}>
-                      <TableCell className="font-medium">{log.admin?.name || 'Unknown'}</TableCell>
-                      <TableCell>{log.log.action}</TableCell>
-                      <TableCell className="max-w-md">{log.log.details}</TableCell>
-                      <TableCell>{new Date(log.log.createdAt).toLocaleString()}</TableCell>
+                      <TableCell className="font-medium align-top whitespace-nowrap">{log.admin?.name || 'Unknown'}</TableCell>
+                      <TableCell className="align-top whitespace-nowrap">{log.log.action}</TableCell>
+                      <TableCell className="align-top">
+                        <div className="max-w-md break-all whitespace-normal text-muted-foreground">{log.log.details}</div>
+                      </TableCell>
+                      <TableCell className="align-top whitespace-nowrap">{new Date(log.log.createdAt).toLocaleString()}</TableCell>
                     </TableRow>
                   ))
                 ) : (
