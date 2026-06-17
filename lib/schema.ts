@@ -364,6 +364,21 @@ export const userActivityLog = mysqlTable('user_activity_log', {
   eventIdx: index('ual_event_idx').on(table.eventType, table.createdAt),
 }));
 
+// ✅ Bulletin Board — admin-posted news/updates shown to bidders & county users.
+export const bulletinPost = mysqlTable('bulletin_post', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  title: varchar('title', { length: 255 }).notNull(),
+  body: text('body').notNull(),
+  audience: mysqlEnum('audience', ['all', 'bidder', 'county']).default('all').notNull(),
+  pinned: int('pinned').default(0).notNull(),       // 0/1: pinned posts sort to the top
+  published: int('published').default(1).notNull(), // 0/1: drafts vs live
+  createdByAdminId: varchar('created_by_admin_id', { length: 255 }),
+  createdAt: datetime('created_at').notNull(),
+  updatedAt: datetime('updated_at').notNull(),
+}, (table) => ({
+  publishedIdx: index('bulletin_published_idx').on(table.published, table.pinned, table.createdAt),
+}));
+
 // ============================================================================
 // 🔄 Bidirectional sync with OwnMidwest (data.ownmidwest.com)
 // See BIDIRECTIONAL_SYNC_PROPOSAL.md. These four tables hold sync MACHINERY
