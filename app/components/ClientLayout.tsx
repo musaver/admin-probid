@@ -31,18 +31,22 @@ interface NavItem {
 }
 
 const navigation: NavItem[] = [
+  // Daily work
   { name: 'Dashboard',   href: '/',            icon: LayoutDashboard },
   { name: 'Properties',  href: '/properties',  icon: Building2 },
   { name: 'Review',      href: '/review',      icon: ClipboardCheck },
   { name: 'Bidder Verify', href: '/bidder-verification', icon: UserCheck },
+  // Communication
   { name: 'Bulletin',    href: '/bulletin',    icon: Megaphone },
-  { name: 'Users',       href: '/users',       icon: Users },
   { name: 'Messaging',   href: '/messaging',   icon: MessageSquare },
+  // People
+  { name: 'Users',       href: '/users',       icon: Users },
   { name: 'Admin Users', href: '/admins',      icon: ShieldCheck },
   { name: 'Admin Roles', href: '/roles',       icon: KeyRound },
-  { name: 'Admin Logs',  href: '/logs',        icon: ClipboardList },
+  // System & audit
   { name: 'Sync Status', href: '/sync-status', icon: RefreshCw },
   { name: 'Activity',    href: '/activity',    icon: Activity },
+  { name: 'Admin Logs',  href: '/logs',        icon: ClipboardList },
   { name: 'Logout',      href: '/logout',      icon: LogOut },
 ];
 
