@@ -1,7 +1,7 @@
 // POST /api/bidder-claims/:id/reject  { note: "why" }
 // Marks a bidder claim rejected (links nothing) and emails the bidder.
 
-import { NextResponse, after } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { eq } from 'drizzle-orm';
 import { authOptions } from '@/lib/auth';
@@ -30,18 +30,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .set({ status: 'rejected', reviewedByAdminId: adminId, reviewedAt: now, note })
     .where(eq(bidderClaim.id, id));
 
-  after(async () => {
-    try {
-      const [b] = await db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, claim.bidderUserId)).limit(1);
-      if (b?.email) {
-        await sendTextEmail(
-          b.email,
-          'Update on your BidBridge claim',
-          `Hi ${b.name || ''},\n\nWe couldn't verify your recent claim. Reason: ${note}\n\nPlease double-check your bidder number and property details and submit again.`,
-        );
-      }
-    } catch (e) { console.error('[bidder-reject] email failed', e); }
-  });
+  try {
+    const [b] = await db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, claim.bidderUserId)).limit(1);
+    if (b?.email) {
+      await sendTextEmail(
+        b.email,
+        'Update on your BidBridge claim',
+        `Hi ${b.name || ''},\n\nWe couldn't verify your recent claim. Reason: ${note}\n\nPlease double-check your bidder number and property details and submit again.`,
+      );
+    }
+  } catch (e) { console.error('[bidder-reject] email failed', e); }
 
   return NextResponse.json({ success: true });
 }

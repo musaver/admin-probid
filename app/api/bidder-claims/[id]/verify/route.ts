@@ -3,7 +3,7 @@
 // the bidder, marks the claim verified, and emails the bidder. Re-checks matches live, so
 // results uploaded after the claim are picked up.
 
-import { NextResponse, after } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -57,19 +57,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .set({ status: 'verified', reviewedByAdminId: adminId, reviewedAt: now })
     .where(eq(bidderClaim.id, id));
 
-  // Email the bidder (the only notification channel the client wants).
-  after(async () => {
-    try {
-      const [b] = await db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, claim.bidderUserId)).limit(1);
-      if (b?.email) {
-        await sendTextEmail(
-          b.email,
-          'Your BidBridge properties are verified',
-          `Hi ${b.name || ''},\n\nYour winning bids have been verified and ${linked} propert${linked === 1 ? 'y is' : 'ies are'} now visible in your BidBridge account.\n\nThank you.`,
-        );
-      }
-    } catch (e) { console.error('[bidder-verify] email failed', e); }
-  });
+  // Email the bidder (the only notification channel the client wants). Awaited so it reliably
+  // sends; wrapped so an email failure never fails the verification.
+  try {
+    const [b] = await db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, claim.bidderUserId)).limit(1);
+    if (b?.email) {
+      await sendTextEmail(
+        b.email,
+        'Your BidBridge properties are verified',
+        `Hi ${b.name || ''},\n\nYour winning bids have been verified and ${linked} propert${linked === 1 ? 'y is' : 'ies are'} now visible in your BidBridge account.\n\nThank you.`,
+      );
+    }
+  } catch (e) { console.error('[bidder-verify] email failed', e); }
 
   return NextResponse.json({ success: true, linked, total: items.length });
 }

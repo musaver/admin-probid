@@ -2,7 +2,7 @@
 // Applies the requested field change to the property, marks the request approved,
 // notifies the requester, writes an admin log, and queues the change for OwnMidwest.
 
-import { NextResponse, after } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -119,7 +119,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       : ['address', 'city', 'zipCode'].includes(cr.fieldName) ? 'update_address'
       : 'update_tax_sale';
     await enqueuePropertyToOwnMidwest(row, op, 'local');
-    after(async () => { try { await drainOutbox(); } catch (e) { console.error('[review-approve] drain failed', e); } });
+    try { await drainOutbox(); } catch (e) { console.error('[review-approve] drain failed (queued — retry from Sync Status)', e); }
   } catch (e) {
     console.error('[review-approve] enqueue failed (change still applied):', e);
   }

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse, after } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { db } from '@/lib/db';
 import { property, user, notifications, propertyLinkedBidders } from '@/lib/schema';
@@ -135,13 +135,14 @@ export async function PUT(
       if (addressChanged) await enqueuePropertyToOwnMidwest(propertyRow, 'update_address', origin);
 
       if (taxChanged || ownerChanged || addressChanged) {
-        after(async () => {
-          try {
-            await drainOutbox();
-          } catch (e) {
-            console.error('[reverse-sync] async drain failed (row stays pending until next change):', e);
-          }
-        });
+        // Deliver inline (awaited) so it never gets stuck "pending" — reliable on Vercel
+        // without depending on after()/Fluid Compute. The property is already saved above,
+        // so a push failure doesn't lose the edit (it stays queued; retry from Sync Status).
+        try {
+          await drainOutbox();
+        } catch (e) {
+          console.error('[reverse-sync] drain failed (change queued — retry from Sync Status):', e);
+        }
       }
     } catch (e) {
       console.error('[reverse-sync] enqueue failed (property still saved):', e);
