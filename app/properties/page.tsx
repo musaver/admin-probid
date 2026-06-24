@@ -28,6 +28,7 @@ interface PropertyRow {
     saleId: string;
     status: string;
     minBid: string | null;
+    winningBidderNumber: string | null;
     createdAt: string;
   };
   creator: {
@@ -479,6 +480,9 @@ export default function PropertiesList() {
                         <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('minBid')}>
                           <div className="flex items-center whitespace-nowrap">Min Bid {getSortIcon('minBid')}</div>
                         </TableHead>
+                        <TableHead className="py-2 px-3">
+                          <div className="flex items-center whitespace-nowrap">Winning Bidder #</div>
+                        </TableHead>
                         <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('bidders')}>
                           <div className="flex items-center whitespace-nowrap">Bidders {getSortIcon('bidders')}</div>
                         </TableHead>
@@ -512,6 +516,11 @@ export default function PropertiesList() {
                             </Select>
                           </TableCell>
                           <TableCell className="py-1.5 px-3">{row.property.minBid ? `$${Number(row.property.minBid).toLocaleString()}` : '—'}</TableCell>
+                          <TableCell className="py-1.5 px-3">
+                            {row.property.winningBidderNumber
+                              ? <Badge variant="outline" className="font-mono text-xs">#{row.property.winningBidderNumber}</Badge>
+                              : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
                           <TableCell className="py-1.5 px-3">
                             {row.linkedBiddersCount > 0 ? (
                               <Badge
@@ -680,6 +689,12 @@ export default function PropertiesList() {
         <DialogContent className="sm:max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Linked Bidders — {biddersProperty?.property.title}</DialogTitle>
+            {biddersProperty?.property.winningBidderNumber && (
+              <p className="text-sm text-muted-foreground">
+                Winning bidder on this property (from auction results):{' '}
+                <span className="font-mono font-semibold text-foreground">#{biddersProperty.property.winningBidderNumber}</span>
+              </p>
+            )}
           </DialogHeader>
           {biddersLoading ? (
             <div className="flex items-center justify-center py-12">
