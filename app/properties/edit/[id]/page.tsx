@@ -42,7 +42,7 @@ export default function EditProperty() {
   const [minBid, setMinBid] = useState('');
   const [winningBidderNumber, setWinningBidderNumber] = useState('');
   const [status, setStatus] = useState('active');
-  const [ownerName, setOwnerName] = useState('');
+  const [owners, setOwners] = useState<string[]>(['']);
 
   useEffect(() => {
     const fetchProperty = async () => {
@@ -66,14 +66,15 @@ export default function EditProperty() {
         setMinBid(data.minBid || '');
         setWinningBidderNumber(data.winningBidderNumber || '');
         setStatus(data.status || 'active');
-        // owners is a JSON array; show the primary (first) owner name.
-        let firstOwner = '';
+        // owners is a JSON array — load ALL of them so editing never drops one.
+        let ownerList: string[] = [];
         const ow = data.owners;
-        if (Array.isArray(ow)) firstOwner = ow[0] ? String(ow[0]) : '';
+        if (Array.isArray(ow)) ownerList = ow.map((o) => String(o ?? '')).filter((o) => o.length > 0);
         else if (typeof ow === 'string') {
-          try { const a = JSON.parse(ow); firstOwner = Array.isArray(a) ? String(a[0] ?? '') : ow; } catch { firstOwner = ow; }
+          try { const a = JSON.parse(ow); ownerList = Array.isArray(a) ? a.map((o) => String(o ?? '')).filter((o) => o.length > 0) : (ow ? [ow] : []); }
+          catch { ownerList = ow ? [ow] : []; }
         }
-        setOwnerName(firstOwner);
+        setOwners(ownerList.length ? ownerList : ['']);
         setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load property');
@@ -106,7 +107,7 @@ export default function EditProperty() {
           minBid: minBid || null,
           winningBidderNumber: winningBidderNumber.trim() || null,
           status,
-          owners: ownerName.trim() ? [ownerName.trim()] : null,
+          owners: (() => { const cleaned = owners.map((o) => o.trim()).filter(Boolean); return cleaned.length ? cleaned : null; })(),
         }),
       });
 
@@ -176,8 +177,25 @@ export default function EditProperty() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ownerName">Owner Name</Label>
-              <Input id="ownerName" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Primary owner name" />
+              <Label>Owner Name{owners.length > 1 ? 's' : ''}</Label>
+              {owners.map((o, i) => (
+                <div key={i} className="flex gap-2">
+                  <Input
+                    value={o}
+                    onChange={(e) => setOwners((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                    placeholder={i === 0 ? 'Primary owner name' : `Owner ${i + 1}`}
+                  />
+                  {owners.length > 1 && (
+                    <Button type="button" variant="outline" size="sm"
+                      onClick={() => setOwners((prev) => prev.filter((_, j) => j !== i))}>
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" onClick={() => setOwners((prev) => [...prev, ''])}>
+                + Add owner
+              </Button>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
