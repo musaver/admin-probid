@@ -54,7 +54,6 @@ export default function AddProperty() {
   const [minBid, setMinBid] = useState('');
   const [winningBid, setWinningBid] = useState('');
   const [status, setStatus] = useState('active');
-  const [auctionStart, setAuctionStart] = useState('');
   const [auctionEnd, setAuctionEnd] = useState('');
 
   // Assignment
@@ -171,7 +170,6 @@ export default function AddProperty() {
           city: city || null,
           zipCode: zipCode || null,
           owners: owners.filter(o => o.trim()),
-          auctionStart: auctionStart || null,
           auctionEnd: auctionEnd || null,
           minBid: cleanMinBid,
           winningBid: cleanWinningBid,
@@ -334,11 +332,7 @@ export default function AddProperty() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="auctionStart">Auction start date</Label>
-                  <Input id="auctionStart" type="date" value={auctionStart} onChange={e => setAuctionStart(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="auctionEnd">Auction end date</Label>
+                  <Label htmlFor="auctionEnd">Auction Date</Label>
                   <Input id="auctionEnd" type="date" value={auctionEnd} onChange={e => setAuctionEnd(e.target.value)} />
                 </div>
               </div>

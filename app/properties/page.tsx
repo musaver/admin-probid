@@ -28,6 +28,7 @@ interface PropertyRow {
     saleId: string;
     status: string;
     minBid: string | null;
+    winningBid: string | null;
     winningBidderNumber: string | null;
     createdAt: string;
   };
@@ -93,8 +94,8 @@ export default function PropertiesList() {
   const [countyFilter, setCountyFilter] = useState(searchParams.get('countyId') || 'all');
   const [countyUsers, setCountyUsers] = useState<CountyUser[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
-    key: searchParams.get('sort') || 'createdAt',
-    direction: (searchParams.get('direction') as 'asc' | 'desc') || 'desc',
+    key: searchParams.get('sort') || 'saleId',
+    direction: (searchParams.get('direction') as 'asc' | 'desc') || 'asc',
   });
   const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1'));
   const [pageSize, setPageSize] = useState(searchParams.get('pageSize') || '100');
@@ -470,6 +471,9 @@ export default function PropertiesList() {
                   <Table className="text-xs">
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('saleId')}>
+                          <div className="flex items-center whitespace-nowrap">Sale ID {getSortIcon('saleId')}</div>
+                        </TableHead>
                         <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('title')}>
                           <div className="flex items-center whitespace-nowrap">Title {getSortIcon('title')}</div>
                         </TableHead>
@@ -479,6 +483,9 @@ export default function PropertiesList() {
                         </TableHead>
                         <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('minBid')}>
                           <div className="flex items-center whitespace-nowrap">Min Bid {getSortIcon('minBid')}</div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('winningBid')}>
+                          <div className="flex items-center whitespace-nowrap">Max Bid {getSortIcon('winningBid')}</div>
                         </TableHead>
                         <TableHead className="py-2 px-3">
                           <div className="flex items-center whitespace-nowrap">Winning Bidder #</div>
@@ -495,6 +502,7 @@ export default function PropertiesList() {
                     <TableBody>
                       {group.rows.map((row) => (
                         <TableRow key={row.property.id}>
+                          <TableCell className="font-mono py-1.5 px-3 whitespace-nowrap">{row.property.saleId || '—'}</TableCell>
                           <TableCell className="font-medium max-w-[160px] truncate py-1.5 px-3">{row.property.title}</TableCell>
                           <TableCell className="max-w-[140px] truncate py-1.5 px-3">{row.property.address || '—'}</TableCell>
                           <TableCell className="py-1 px-3">
@@ -516,6 +524,7 @@ export default function PropertiesList() {
                             </Select>
                           </TableCell>
                           <TableCell className="py-1.5 px-3">{row.property.minBid ? `$${Number(row.property.minBid).toLocaleString()}` : '—'}</TableCell>
+                          <TableCell className="py-1.5 px-3">{row.property.winningBid ? `$${Number(row.property.winningBid).toLocaleString()}` : '—'}</TableCell>
                           <TableCell className="py-1.5 px-3">
                             {row.property.winningBidderNumber
                               ? <Badge variant="outline" className="font-mono text-xs">#{row.property.winningBidderNumber}</Badge>
