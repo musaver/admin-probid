@@ -12,6 +12,7 @@ export type PropertySnapshot = {
   minBid: string | null;
   winningBid: string | null;
   winningBidderId: string | null;
+  winningBidderNumber: string | null;
   description: string | null;
   status: string | null;
   auctionEnd: string | Date | null;
@@ -123,10 +124,19 @@ export async function buildTaxSaleBody(p: PropertySnapshot): Promise<TaxSaleBuil
   const winning = p.winningBid != null ? Number(p.winningBid) : 0;
   const maximumBid = winning > minimumBid ? winning : minimumBid;
 
-  // OwnMidwest's UpdateTaxSale requires a non-empty bidderInfo (their "bidder number").
-  // Maps to the winning bidder's user.bidder_number. Empty when there is no winning
-  // bidder yet (e.g. still on the list) — OwnMidwest may reject Update in that case.
-  const bidderInfo = (await resolveBidderNumber(p.winningBidderId)) ?? '';
+  // OwnMidwest's UpdateTaxSale REQUIRES a non-empty bidderInfo (their "bidder number"),
+  // or it rejects with HTTP 400 "BidderInfo is required." Prefer the property's own
+  // winning_bidder_number (the auction number — came IN from OwnMidwest, or the admin
+  // entered it), then fall back to the winning bidder's user.bidder_number.
+  const bidderInfo = (p.winningBidderNumber && String(p.winningBidderNumber).trim())
+    || (await resolveBidderNumber(p.winningBidderId))
+    || '';
+
+  // Guard: don't push an update OwnMidwest will reject. Instead of a cryptic "dead" row,
+  // give an actionable reason — set the Winning Bidder # on the property, then Retry.
+  if (!bidderInfo) {
+    return { ok: false, reason: 'Waiting for Winning Bidder # — set it on the property (Edit), then click Retry.' };
+  }
 
   // OwnMidwest requires competitorStatus even though BidBridge doesn't track competitors.
   const competitorStatus = await resolveDefaultCompetitorStatus();
@@ -157,6 +167,7 @@ export function snapshotOf(p: Record<string, unknown>): PropertySnapshot {
     minBid: (p.minBid as string) ?? null,
     winningBid: (p.winningBid as string) ?? null,
     winningBidderId: (p.winningBidderId as string) ?? null,
+    winningBidderNumber: (p.winningBidderNumber as string) ?? null,
     description: (p.description as string) ?? null,
     status: (p.status as string) ?? null,
     auctionEnd: (p.auctionEnd as string | Date) ?? null,

@@ -1,7 +1,14 @@
 // POST /api/bidder-claims/:id/verify
-// Confirms a bidder claim: links every property that currently matches (number + county) to
-// the bidder, marks the claim verified, and emails the bidder. Re-checks matches live, so
-// results uploaded after the claim are picked up.
+// Confirms a bidder claim and links properties to the bidder.
+//
+// Body (optional): { itemIds?: string[] }
+//   - itemIds given  → ADMIN MANUAL mode: link exactly those claim items the admin ticked
+//     (as long as the item resolves to a real property), regardless of auto-match result.
+//   - no itemIds     → AUTO mode: link only items whose number currently matches.
+//
+// Honest status: the claim is marked "verified" and the bidder emailed ONLY if at least one
+// property was actually linked. If nothing links, the claim stays "pending" (no false
+// "verified" email) so the admin can set the Winning Bidder # / tick items and try again.
 
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
@@ -19,6 +26,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!adminId) return new NextResponse('Unauthorized', { status: 401 });
 
   const { id } = await params;
+
+  // Optional body: which items to force-link (admin's checkboxes).
+  let selectedIds: string[] | null = null;
+  try {
+    const body = await req.json();
+    if (Array.isArray(body?.itemIds)) selectedIds = body.itemIds.map(String);
+  } catch { /* no body → auto mode */ }
+
   const [claim] = await db.select().from(bidderClaim).where(eq(bidderClaim.id, id)).limit(1);
   if (!claim) return new NextResponse('Claim not found', { status: 404 });
   if (claim.status !== 'pending') return NextResponse.json({ error: `Claim is already ${claim.status}` }, { status: 409 });
@@ -34,7 +49,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .set({ resolvedPropertyId: m.propertyId, matchStatus: m.match })
       .where(eq(bidderClaimItem.id, it.id));
 
-    if (m.match === 'matched' && m.propertyId) {
+    // Decide whether to link this item:
+    //  - manual mode: admin ticked it AND it resolves to a real property
+    //  - auto mode:   it auto-matched
+    const shouldLink = selectedIds
+      ? selectedIds.includes(it.id) && !!m.propertyId
+      : m.match === 'matched' && !!m.propertyId;
+
+    if (shouldLink && m.propertyId) {
       const [existing] = await db
         .select({ id: propertyLinkedBidders.id })
         .from(propertyLinkedBidders)
@@ -51,6 +73,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
       linked++;
     }
+  }
+
+  // Honest status: only mark verified + email if something actually linked.
+  if (linked === 0) {
+    return NextResponse.json({
+      success: false,
+      linked: 0,
+      total: items.length,
+      message: 'No properties were linked, so the claim is still pending. Set the Winning Bidder # on the property (or tick the properties to link), then verify again.',
+    });
   }
 
   await db.update(bidderClaim)

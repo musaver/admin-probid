@@ -170,6 +170,7 @@ export const bidderClaim = mysqlTable('bidder_claim', {
   reviewedByAdminId: varchar('reviewed_by_admin_id', { length: 255 }),
   reviewedAt: datetime('reviewed_at'),
   note: text('note'),
+  receiptUrl: varchar('receipt_url', { length: 1024 }), // optional proof (bid receipt PDF/image) the bidder attached
   createdAt: datetime('created_at').notNull(),
 }, (table) => ({
   bidderIdx: index('bidder_claim_bidder_idx').on(table.bidderUserId),

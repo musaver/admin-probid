@@ -10,7 +10,7 @@ import { drainOutbox } from '@/lib/sync/drain';
 
 // The fields whose direct admin edits should trigger the "recently changed" highlight + notify.
 // Which property fields map to each OwnMidwest sync operation.
-const TAX_SALE_FIELDS = ['parcelId', 'saleId', 'minBid', 'winningBid', 'status', 'auctionEnd', 'description', 'winningBidderId'];
+const TAX_SALE_FIELDS = ['parcelId', 'saleId', 'minBid', 'winningBid', 'status', 'auctionEnd', 'description', 'winningBidderId', 'winningBidderNumber'];
 const OWNER_FIELDS = ['owners'];
 const ADDRESS_FIELDS = ['address', 'city', 'zipCode'];
 const TRACKED_FIELDS = [...TAX_SALE_FIELDS, ...OWNER_FIELDS, ...ADDRESS_FIELDS];

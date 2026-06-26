@@ -40,6 +40,7 @@ export default function EditProperty() {
   const [yearBuilt, setYearBuilt] = useState('');
   const [lotSize, setLotSize] = useState('');
   const [minBid, setMinBid] = useState('');
+  const [winningBidderNumber, setWinningBidderNumber] = useState('');
   const [status, setStatus] = useState('active');
   const [ownerName, setOwnerName] = useState('');
 
@@ -63,6 +64,7 @@ export default function EditProperty() {
         setYearBuilt(data.yearBuilt ? String(data.yearBuilt) : '');
         setLotSize(data.lotSize || '');
         setMinBid(data.minBid || '');
+        setWinningBidderNumber(data.winningBidderNumber || '');
         setStatus(data.status || 'active');
         // owners is a JSON array; show the primary (first) owner name.
         let firstOwner = '';
@@ -102,6 +104,7 @@ export default function EditProperty() {
           yearBuilt: yearBuilt ? Number(yearBuilt) : null,
           lotSize: lotSize || null,
           minBid: minBid || null,
+          winningBidderNumber: winningBidderNumber.trim() || null,
           status,
           owners: ownerName.trim() ? [ownerName.trim()] : null,
         }),
@@ -214,10 +217,14 @@ export default function EditProperty() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="minBid">Minimum Bid ($)</Label>
                 <Input id="minBid" type="number" step="0.01" value={minBid} onChange={(e) => setMinBid(e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="winningBidderNumber">Winning Bidder #</Label>
+                <Input id="winningBidderNumber" value={winningBidderNumber} onChange={(e) => setWinningBidderNumber(e.target.value)} placeholder="e.g. 34" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Status <span className="text-destructive">*</span></Label>
