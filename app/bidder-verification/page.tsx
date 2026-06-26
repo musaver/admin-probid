@@ -94,6 +94,33 @@ export default function BidderVerificationPage() {
         <p className="text-sm text-muted-foreground">Confirm bidder signups — their county bidder number vs. the winning bidder on each claimed property.</p>
       </div>
 
+      <div className="rounded-lg border bg-muted/40 p-4 text-sm space-y-2">
+        <p className="font-semibold">How verification works</p>
+        <p className="text-muted-foreground">
+          A bidder claims &quot;I&apos;m bidder #N in this county and won these properties.&quot; Each claimed property is
+          auto-checked against the recorded auction results. Tick what you&apos;ve confirmed, then <strong>Verify &amp; Link</strong>.
+          The bidder is emailed only when at least one property links.
+        </p>
+        <ul className="space-y-1.5 text-muted-foreground">
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+            <span><strong className="text-foreground">Matches</strong> — the bidder&apos;s number equals the property&apos;s Winning Bidder # and the county agrees. Pre-ticked — safe to link.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <XCircle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+            <span><strong className="text-foreground">Mismatch</strong> — the Winning Bidder # or the county is different (e.g. claimed under the wrong county). Check the receipt before linking; or fix the property&apos;s Winning Bidder # / the bidder&apos;s county.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Clock className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+            <span><strong className="text-foreground">Awaiting results</strong> — that property has no Winning Bidder # recorded yet. <strong className="text-foreground">Set it via Edit Property</strong> (then it auto-matches), or tick &amp; link it manually after checking the receipt.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-muted-foreground mt-0.5 shrink-0">—</span>
+            <span><strong className="text-foreground">Not found</strong> — no property matches that Sale ID / parcel number, so it can&apos;t be linked. Ask the bidder to re-check the value.</span>
+          </li>
+        </ul>
+      </div>
+
       <Select value={statusFilter} onValueChange={setStatusFilter}>
         <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
         <SelectContent>

@@ -70,6 +70,20 @@ export default function SyncStatusPage() {
         ))}
       </div>
 
+      <div className="rounded-lg border bg-muted/40 p-4 text-sm space-y-2">
+        <p className="font-semibold">What this page shows</p>
+        <p className="text-muted-foreground">
+          Every change you make to a synced property (owner, tax-sale, or address) is pushed to OwnMidwest and listed here.
+        </p>
+        <ul className="space-y-1.5 text-muted-foreground">
+          <li><strong className="text-foreground">delivered</strong> — sent to OwnMidwest successfully. Nothing to do.</li>
+          <li><strong className="text-foreground">pending</strong> — queued, waiting to send. Usually clears on its own; click <strong className="text-foreground">Retry</strong> to send it now.</li>
+          <li><strong className="text-foreground">in&nbsp;flight</strong> — being sent right now.</li>
+          <li><strong className="text-foreground">dead</strong> — OwnMidwest rejected it (see the Error column). Fix the cause, then click <strong className="text-foreground">Retry</strong>. Common reasons: the property has no <strong className="text-foreground">Winning Bidder #</strong>, or it isn&apos;t set up in OwnMidwest (no county mapping).</li>
+        </ul>
+        <p className="text-muted-foreground">Properties that only exist in BidBridge (not in OwnMidwest) can&apos;t be pushed — that&apos;s expected, not a real error.</p>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -99,7 +113,7 @@ export default function SyncStatusPage() {
                     </TableCell>
                     <TableCell className="py-2 px-3"><Badge className={statusColor[r.status]}>{r.status}</Badge></TableCell>
                     <TableCell className="py-2 px-3">{r.attempts}</TableCell>
-                    <TableCell className="py-2 px-3 max-w-[220px] truncate text-red-700" title={r.lastError || ''}>{r.lastError || '—'}</TableCell>
+                    <TableCell className="py-2 px-3 max-w-[420px] whitespace-normal break-words text-xs text-red-700">{r.lastError || '—'}</TableCell>
                     <TableCell className="py-2 px-3 whitespace-nowrap text-xs text-muted-foreground">
                       {new Date(r.deliveredAt || r.createdAt).toLocaleString()}
                     </TableCell>
