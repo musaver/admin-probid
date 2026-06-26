@@ -60,6 +60,9 @@ export default function AddProperty() {
   const [countyUsers, setCountyUsers] = useState<CountyUser[]>([]);
   const [loadingCounties, setLoadingCounties] = useState(true);
   const [createdBy, setCreatedBy] = useState('');
+  // OwnMidwest county this property belongs to (the real county, from sync_lookup).
+  const [counties, setCounties] = useState<{ omId: number; name: string }[]>([]);
+  const [omCountyId, setOmCountyId] = useState('');
 
   // Bidder search
   const [bidderQuery, setBidderQuery] = useState('');
@@ -89,6 +92,13 @@ export default function AddProperty() {
       }
     };
     fetchCountyUsers();
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/counties')
+      .then((r) => r.json())
+      .then((d) => setCounties(d.counties || []))
+      .catch(() => {});
   }, []);
 
   const searchBidders = useCallback((q: string) => {
@@ -170,6 +180,7 @@ export default function AddProperty() {
           city: city || null,
           zipCode: zipCode || null,
           owners: owners.filter(o => o.trim()),
+          omCountyId: omCountyId ? Number(omCountyId) : null,
           auctionEnd: auctionEnd || null,
           minBid: cleanMinBid,
           winningBid: cleanWinningBid,
@@ -345,6 +356,23 @@ export default function AddProperty() {
               <CardTitle>Assignment</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>County</Label>
+                <Select value={omCountyId} onValueChange={setOmCountyId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select the county this property is in" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {counties.map((c) => (
+                      <SelectItem key={c.omId} value={String(c.omId)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">The real county (from OwnMidwest). Used to group properties, match bidders, and sync. Leave blank for a local-only property.</p>
+              </div>
+
+              <Separator />
+
               <div className="space-y-2">
                 <Label>County User <span className="text-destructive">*</span></Label>
                 {loadingCounties ? (

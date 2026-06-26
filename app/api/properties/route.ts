@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { property, user, propertyLinkedBidders } from '@/lib/schema';
+import { property, user, propertyLinkedBidders, syncLookup } from '@/lib/schema';
 import { eq, desc, asc, count, like, or, and, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       whereClauses.push(eq(property.status, status as any));
     }
     if (countyId) {
-      whereClauses.push(eq(property.createdBy, countyId));
+      whereClauses.push(eq(property.omCountyId, Number(countyId)));
     }
 
     const where = whereClauses.length > 0 ? and(...whereClauses) : undefined;
@@ -58,11 +58,13 @@ export async function GET(request: Request) {
           name: user.name,
           email: user.email,
         },
+        countyName: syncLookup.omName,
         linkedBiddersCount: sql<number>`coalesce(${bidderCounts.count}, 0)`,
       })
       .from(property)
       .leftJoin(user, eq(property.createdBy, user.id))
       .leftJoin(bidderCounts, eq(property.id, bidderCounts.propertyId))
+      .leftJoin(syncLookup, and(eq(syncLookup.kind, 'county'), eq(syncLookup.omId, property.omCountyId)))
       .where(where)
       .orderBy(direction === 'asc' ? asc(sortColumn) : desc(sortColumn))
       .limit(pageSize === 'all' ? 1000000 : parseInt(pageSize))
@@ -98,6 +100,7 @@ export async function POST(request: Request) {
       minBid: body.minBid || null,
       winningBid: body.winningBid || null,
       winningBidderId: body.winningBidderId || null,
+      omCountyId: body.omCountyId ?? null,
       visibilitySettings: body.visibilitySettings || null,
       status: body.status || 'active',
       countyStatus: body.countyStatus || null, // county-only workflow status (not synced)

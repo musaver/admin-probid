@@ -43,6 +43,8 @@ export default function EditProperty() {
   const [winningBidderNumber, setWinningBidderNumber] = useState('');
   const [status, setStatus] = useState('active');
   const [owners, setOwners] = useState<string[]>(['']);
+  const [counties, setCounties] = useState<{ omId: number; name: string }[]>([]);
+  const [omCountyId, setOmCountyId] = useState('');
 
   useEffect(() => {
     const fetchProperty = async () => {
@@ -65,6 +67,7 @@ export default function EditProperty() {
         setLotSize(data.lotSize || '');
         setMinBid(data.minBid || '');
         setWinningBidderNumber(data.winningBidderNumber || '');
+        setOmCountyId(data.omCountyId != null ? String(data.omCountyId) : '');
         setStatus(data.status || 'active');
         // owners is a JSON array — load ALL of them so editing never drops one.
         let ownerList: string[] = [];
@@ -83,6 +86,13 @@ export default function EditProperty() {
     };
     fetchProperty();
   }, [propertyId]);
+
+  useEffect(() => {
+    fetch('/api/counties')
+      .then((r) => r.json())
+      .then((d) => setCounties(d.counties || []))
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,6 +116,7 @@ export default function EditProperty() {
           lotSize: lotSize || null,
           minBid: minBid || null,
           winningBidderNumber: winningBidderNumber.trim() || null,
+          omCountyId: omCountyId ? Number(omCountyId) : null,
           status,
           owners: (() => { const cleaned = owners.map((o) => o.trim()).filter(Boolean); return cleaned.length ? cleaned : null; })(),
         }),
@@ -174,6 +185,22 @@ export default function EditProperty() {
             <div className="space-y-2">
               <Label htmlFor="address">Address</Label>
               <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>County</Label>
+              <Select value={omCountyId || 'none'} onValueChange={(v) => setOmCountyId(v === 'none' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select the county this property is in" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None (local only) —</SelectItem>
+                  {counties.map((c) => (
+                    <SelectItem key={c.omId} value={String(c.omId)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">The real county (from OwnMidwest). Used to group properties, match bidders, and sync.</p>
             </div>
 
             <div className="space-y-2">

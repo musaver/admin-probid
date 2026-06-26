@@ -30,6 +30,7 @@ interface PropertyRow {
     minBid: string | null;
     winningBid: string | null;
     winningBidderNumber: string | null;
+    omCountyId: number | null;
     createdAt: string;
   };
   creator: {
@@ -37,6 +38,7 @@ interface PropertyRow {
     name: string | null;
     email: string;
   } | null;
+  countyName: string | null;
   linkedBiddersCount: number;
 }
 
@@ -93,6 +95,7 @@ export default function PropertiesList() {
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [countyFilter, setCountyFilter] = useState(searchParams.get('countyId') || 'all');
   const [countyUsers, setCountyUsers] = useState<CountyUser[]>([]);
+  const [counties, setCounties] = useState<{ omId: number; name: string }[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
     key: searchParams.get('sort') || 'saleId',
     direction: (searchParams.get('direction') as 'asc' | 'desc') || 'asc',
@@ -100,11 +103,15 @@ export default function PropertiesList() {
   const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1'));
   const [pageSize, setPageSize] = useState(searchParams.get('pageSize') || '100');
 
-  // Fetch county users for filter dropdown
+  // Fetch county users (still used elsewhere) + the real OwnMidwest county list for the filter.
   useEffect(() => {
     fetch('/api/users?type=county&pageSize=all')
       .then(r => r.json())
       .then(data => setCountyUsers(data.users || []))
+      .catch(() => {});
+    fetch('/api/counties')
+      .then(r => r.json())
+      .then(data => setCounties(data.counties || []))
       .catch(() => {});
   }, []);
 
@@ -411,8 +418,8 @@ export default function PropertiesList() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Counties</SelectItem>
-            {countyUsers.map((c) => (
-              <SelectItem key={c.id} value={c.id}>{c.name || c.email}</SelectItem>
+            {counties.map((c) => (
+              <SelectItem key={c.omId} value={String(c.omId)}>{c.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -451,9 +458,9 @@ export default function PropertiesList() {
         <div className="space-y-6">
           {Array.from(
             properties.reduce((map, row) => {
-              const id = row.creator?.id || 'none';
+              const id = row.property.omCountyId != null ? String(row.property.omCountyId) : 'none';
               if (!map.has(id)) {
-                map.set(id, { countyName: row.creator?.name || row.creator?.email || 'Unassigned County', rows: [] as PropertyRow[] });
+                map.set(id, { countyName: row.countyName || 'Unassigned (no county)', rows: [] as PropertyRow[] });
               }
               map.get(id)!.rows.push(row);
               return map;

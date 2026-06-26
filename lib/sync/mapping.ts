@@ -3,7 +3,7 @@
 
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { syncLookup, syncStatusMap, user } from '@/lib/schema';
+import { property, syncLookup, syncStatusMap, user } from '@/lib/schema';
 
 export type PropertySnapshot = {
   id: string;
@@ -24,6 +24,15 @@ export type PropertySnapshot = {
 
 /** The OwnMidwest county id for a property (stored when it first synced FROM them). null if unknown. */
 export async function resolveCountyId(propertyId: string): Promise<number | null> {
+  // Prefer the county set on the property itself (admin's selection / manual entry),
+  // then fall back to the mapping captured when it first synced from OwnMidwest.
+  const [p] = await db
+    .select({ omCountyId: property.omCountyId })
+    .from(property)
+    .where(eq(property.id, propertyId))
+    .limit(1);
+  if (p?.omCountyId != null) return p.omCountyId;
+
   const rows = await db
     .select({ omCountyId: syncStatusMap.omCountyId })
     .from(syncStatusMap)

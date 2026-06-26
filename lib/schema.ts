@@ -105,6 +105,7 @@ export const property = mysqlTable('property', {
   winningBid: decimal('winning_bid', { precision: 12, scale: 2 }), // Manual override or record
   winningBidderId: varchar('winning_bidder_id', { length: 255 }), // Linked to user.id
   winningBidderNumber: varchar('winning_bidder_number', { length: 50 }), // OwnMidwest bidder number for this property (from inbound bidderInfo); used to verify bidder claims
+  omCountyId: int('om_county_id'), // the OwnMidwest county this property belongs to (sync_lookup kind='county'); set on add/edit or from inbound sync
   visibilitySettings: json('visibility_settings'),
   status: mysqlEnum('status', [
     'active',
