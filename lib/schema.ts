@@ -6,6 +6,7 @@ import {
   primaryKey,
   mysqlEnum,
   int,
+  bigint,
   json,
   index,
   decimal
@@ -448,4 +449,17 @@ export const syncLookup = mysqlTable('sync_lookup', {
   updatedAt: datetime('updated_at').notNull(),
 }, (table) => ({
   kindIdx: index('sync_lookup_kind_idx').on(table.kind, table.omId),
+}));
+
+// ✅ Support messages — a direct thread between a bidder/county user and the platform admin.
+// One thread per user (all their messages). senderRole says who sent each message.
+export const supportMessage = mysqlTable('support_message', {
+  id: bigint('id', { mode: 'number' }).autoincrement().primaryKey(),
+  userId: varchar('user_id', { length: 255 }).notNull(),           // FK -> user.id (the bidder/county the thread belongs to)
+  senderRole: mysqlEnum('sender_role', ['user', 'admin']).notNull(),
+  body: text('body').notNull(),
+  isRead: int('is_read').default(0).notNull(),                     // read by the *other* side
+  createdAt: datetime('created_at').notNull(),
+}, (table) => ({
+  userIdx: index('support_message_user_idx').on(table.userId, table.createdAt),
 }));

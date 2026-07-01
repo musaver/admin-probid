@@ -21,6 +21,7 @@ import {
   Activity,
   LogOut,
   MessageSquare,
+  Headset,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -39,6 +40,7 @@ const navigation: NavItem[] = [
   // Communication
   { name: 'Bulletin',    href: '/bulletin',    icon: Megaphone },
   { name: 'Messaging',   href: '/messaging',   icon: MessageSquare },
+  { name: 'Support',     href: '/support',     icon: Headset },
   // People
   { name: 'Users',       href: '/users',       icon: Users },
   { name: 'Admin Users', href: '/admins',      icon: ShieldCheck },
