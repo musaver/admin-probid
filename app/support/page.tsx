@@ -19,7 +19,7 @@ export default function AdminSupportPage() {
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(true);
-  const endRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
 
   const loadThreads = useCallback(async () => {
     try { const r = await fetch('/api/support'); const d = await r.json(); setThreads(d.threads || []); }
@@ -40,7 +40,8 @@ export default function AdminSupportPage() {
     return () => clearInterval(t);
   }, [activeUser, loadThread]);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  // Scroll only the messages box, not the whole page.
+  useEffect(() => { if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight; }, [messages]);
 
   const send = async () => {
     const b = reply.trim();
@@ -93,7 +94,7 @@ export default function AdminSupportPage() {
                   <div className="font-semibold">{threadUser?.name || threadUser?.email || 'User'}</div>
                   <div className="text-xs text-muted-foreground capitalize">{threadUser?.email} · {threadUser?.type}</div>
                 </div>
-                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                <div ref={boxRef} className="flex-1 overflow-y-auto space-y-2 pr-1">
                   {messages.map((m) => {
                     const admin = m.senderRole === 'admin';
                     return (
@@ -107,7 +108,6 @@ export default function AdminSupportPage() {
                       </div>
                     );
                   })}
-                  <div ref={endRef} />
                 </div>
                 <div className="flex gap-2 mt-3">
                   <Textarea rows={2} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type your reply…"
