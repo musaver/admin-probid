@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, Plus, Pencil, Trash2, ArrowUpDown, Users, Mail, Loader2, CheckCircle2, Search, ChevronUp, ChevronDown, FileSpreadsheet } from 'lucide-react';
+import { RefreshCw, Plus, Pencil, Trash2, ArrowUpDown, Users, Mail, Loader2, CheckCircle2, Search, ChevronUp, ChevronDown, FileSpreadsheet, X } from 'lucide-react';
 import BulkUploadModal from '@/app/components/BulkUploadModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -94,6 +94,8 @@ export default function PropertiesList() {
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [countyFilter, setCountyFilter] = useState(searchParams.get('countyId') || 'all');
+  const [dateFrom, setDateFrom] = useState(searchParams.get('dateFrom') || '');
+  const [dateTo, setDateTo] = useState(searchParams.get('dateTo') || '');
   const [countyUsers, setCountyUsers] = useState<CountyUser[]>([]);
   const [counties, setCounties] = useState<{ omId: number; name: string }[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
@@ -121,12 +123,14 @@ export default function PropertiesList() {
     if (search) params.set('search', search); else params.delete('search');
     if (statusFilter !== 'all') params.set('status', statusFilter); else params.delete('status');
     if (countyFilter !== 'all') params.set('countyId', countyFilter); else params.delete('countyId');
+    if (dateFrom) params.set('dateFrom', dateFrom); else params.delete('dateFrom');
+    if (dateTo) params.set('dateTo', dateTo); else params.delete('dateTo');
     params.set('sort', sortConfig.key);
     params.set('direction', sortConfig.direction);
     params.set('page', currentPage.toString());
     params.set('pageSize', pageSize);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [search, statusFilter, countyFilter, sortConfig, currentPage, pageSize, pathname, router, searchParams]);
+  }, [search, statusFilter, countyFilter, dateFrom, dateTo, sortConfig, currentPage, pageSize, pathname, router, searchParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -137,7 +141,7 @@ export default function PropertiesList() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, countyFilter, pageSize]);
+  }, [search, statusFilter, countyFilter, dateFrom, dateTo, pageSize]);
 
   // Inline status change
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
@@ -203,6 +207,8 @@ export default function PropertiesList() {
         pageSize: pageSize,
       });
       if (countyFilter !== 'all') params.set('countyId', countyFilter);
+      if (dateFrom) params.set('dateFrom', dateFrom);
+      if (dateTo) params.set('dateTo', dateTo);
       const res = await fetch(`/api/properties?${params.toString()}`);
       const data = await res.json();
       setProperties(data.properties || []);
@@ -212,7 +218,7 @@ export default function PropertiesList() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, countyFilter, sortConfig, currentPage, pageSize]);
+  }, [search, statusFilter, countyFilter, dateFrom, dateTo, sortConfig, currentPage, pageSize]);
 
   useEffect(() => {
     fetchProperties();
@@ -423,6 +429,17 @@ export default function PropertiesList() {
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-1">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">Added:</span>
+          <Input type="date" className="w-[150px]" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} title="From date" />
+          <span className="text-muted-foreground">–</span>
+          <Input type="date" className="w-[150px]" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} title="To date" />
+          {(dateFrom || dateTo) && (
+            <Button variant="ghost" size="sm" className="px-2" onClick={() => { setDateFrom(''); setDateTo(''); }} title="Clear dates">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground whitespace-nowrap">Show:</span>
           <Select value={pageSize} onValueChange={setPageSize}>
@@ -503,7 +520,7 @@ export default function PropertiesList() {
                         <TableHead className="cursor-pointer hover:text-foreground py-2 px-3" onClick={() => requestSort('createdAt')}>
                           <div className="flex items-center whitespace-nowrap">Created At {getSortIcon('createdAt')}</div>
                         </TableHead>
-                        <TableHead className="text-right py-2 px-3">Actions</TableHead>
+                        <TableHead className="text-right py-2 px-3 sticky right-0 bg-background border-l">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -552,7 +569,7 @@ export default function PropertiesList() {
                             )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap py-1.5 px-3">{new Date(row.property.createdAt).toLocaleString()}</TableCell>
-                          <TableCell className="text-right py-1.5 px-3">
+                          <TableCell className="text-right py-1.5 px-3 sticky right-0 bg-background border-l">
                             <TooltipProvider delayDuration={200}>
                             <div className="flex gap-1 justify-end whitespace-nowrap">
                               {row.linkedBiddersCount > 0 && (

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { property, user, propertyLinkedBidders, syncLookup } from '@/lib/schema';
-import { eq, desc, asc, count, like, or, and, sql } from 'drizzle-orm';
+import { eq, desc, asc, count, like, or, and, sql, gte, lte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function GET(request: Request) {
@@ -10,6 +10,8 @@ export async function GET(request: Request) {
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || 'all';
     const countyId = searchParams.get('countyId') || '';
+    const dateFrom = searchParams.get('dateFrom') || '';
+    const dateTo = searchParams.get('dateTo') || '';
     const sort = searchParams.get('sort') || 'createdAt';
     const direction = searchParams.get('direction') || 'desc';
     const page = parseInt(searchParams.get('page') || '1');
@@ -30,6 +32,15 @@ export async function GET(request: Request) {
     }
     if (countyId) {
       whereClauses.push(eq(property.omCountyId, Number(countyId)));
+    }
+    // Date range on when the property was added (createdAt), matching the "Created At" column.
+    if (dateFrom) {
+      const d = new Date(dateFrom);
+      if (!isNaN(d.getTime())) whereClauses.push(gte(property.createdAt, d));
+    }
+    if (dateTo) {
+      const d = new Date(dateTo);
+      if (!isNaN(d.getTime())) { d.setHours(23, 59, 59, 999); whereClauses.push(lte(property.createdAt, d)); }
     }
 
     const where = whereClauses.length > 0 ? and(...whereClauses) : undefined;
