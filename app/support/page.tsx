@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Loader2, Send, Search } from 'lucide-react';
@@ -67,12 +66,16 @@ export default function AdminSupportPage() {
     catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { loadThreads(); const t = setInterval(loadThreads, 8000); return () => clearInterval(t); }, [loadThreads]);
+  useEffect(() => {
+    loadThreads();
+    const t = setInterval(() => { if (!document.hidden) loadThreads(); }, 30000);
+    return () => clearInterval(t);
+  }, [loadThreads]);
 
   useEffect(() => {
     if (!activeUser) return;
     loadThread(activeUser);
-    const t = setInterval(() => loadThread(activeUser), 5000);
+    const t = setInterval(() => { if (!document.hidden) loadThread(activeUser); }, 30000);
     return () => clearInterval(t);
   }, [activeUser, loadThread]);
 
