@@ -20,7 +20,10 @@ const pool =
     connectionLimit: 10,        // cap connections so we never exhaust MySQL
     waitForConnections: true,   // queue queries instead of erroring when all are busy
     queueLimit: 0,
-    enableKeepAlive: true,
+    enableKeepAlive: true,      // TCP keepalive so idle connections aren't silently dropped
+    keepAliveInitialDelay: 0,   // start keepalive immediately
+    idleTimeout: 60000,         // recycle idle connections after 60s — before the DB closes them (avoids ECONNRESET on reuse)
+    maxIdle: 10,
   });
 
 globalForDb._mysqlPool = pool;
