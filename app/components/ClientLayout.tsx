@@ -70,7 +70,7 @@ function NavItems({ pathname, onNavigate, badges }: { pathname: string; onNaviga
               <Icon className="mr-3 h-4 w-4 shrink-0" />
               <span className="flex-1 text-left">{item.name}</span>
               {count > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-600 text-white text-xs font-semibold h-5 min-w-[20px] px-1.5">
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold h-5 min-w-[20px] px-1.5">
                   {count > 99 ? '99+' : count}
                 </span>
               )}
