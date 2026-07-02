@@ -5,7 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Send } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Loader2, Send, Search } from 'lucide-react';
 
 interface Thread { userId: string; name: string | null; email: string | null; type: string | null; lastAt: string; unread: number; lastBody: string | null; }
 interface Msg { id: number; senderRole: 'user' | 'admin'; body: string; createdAt: string; }
@@ -48,7 +49,13 @@ export default function AdminSupportPage() {
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(true);
+  const [search, setSearch] = useState('');
   const boxRef = useRef<HTMLDivElement>(null);
+
+  const q = search.trim().toLowerCase();
+  const filteredThreads = q
+    ? threads.filter((t) => (t.name || '').toLowerCase().includes(q) || (t.email || '').toLowerCase().includes(q))
+    : threads;
 
   const loadThreads = useCallback(async () => {
     try { const r = await fetch('/api/support'); const d = await r.json(); setThreads(d.threads || []); }
@@ -91,14 +98,22 @@ export default function AdminSupportPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Thread list */}
-        <Card className="md:col-span-1">
-          <CardContent className="p-0 divide-y max-h-[70vh] overflow-y-auto">
+        <Card className="md:col-span-1 py-0 gap-0 overflow-hidden">
+          <div className="p-2 border-b">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search users…" className="pl-8 h-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          </div>
+          <CardContent className="p-0 divide-y max-h-[calc(70vh-56px)] overflow-y-auto">
             {loadingThreads ? (
               <div className="p-4 text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
             ) : threads.length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">No messages yet.</div>
+            ) : filteredThreads.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">No users match &quot;{search}&quot;.</div>
             ) : (
-              threads.map((t) => (
+              filteredThreads.map((t) => (
                 <button key={t.userId} onClick={() => setActiveUser(t.userId)} className={`w-full text-left p-3 hover:bg-muted/50 transition-colors ${activeUser === t.userId ? 'bg-muted' : ''}`}>
                   <div className="flex items-center gap-3">
                     <Avatar seed={t.userId} label={t.name || t.email} size={44} />
@@ -131,7 +146,7 @@ export default function AdminSupportPage() {
         </Card>
 
         {/* Thread view */}
-        <Card className="md:col-span-2">
+        <Card className="md:col-span-2 py-0 gap-0 overflow-hidden">
           <CardContent className="p-4 flex flex-col h-[70vh]">
             {!activeUser ? (
               <div className="m-auto text-sm text-muted-foreground">Select a conversation to view.</div>
