@@ -6,9 +6,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { v4 as uuidv4 } from 'uuid';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { supportMessage, user } from '@/lib/schema';
+import { supportMessage, user, notifications } from '@/lib/schema';
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -66,13 +67,30 @@ export async function POST(req: Request) {
   if (!text) return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
   if (text.length > 5000) return NextResponse.json({ error: 'Message is too long.' }, { status: 400 });
 
+  const now = new Date();
   await db.insert(supportMessage).values({
     userId,
     senderRole: 'admin',
     body: text,
     isRead: 0,
-    createdAt: new Date(),
+    createdAt: now,
   });
+
+  // Notify the bidder/county so they see it in their notification bell on ANY page
+  // (not just if they happen to be on the Contact Admin page). Wrapped so a failure
+  // here never fails the reply itself.
+  try {
+    await db.insert(notifications).values({
+      id: uuidv4(),
+      userId,
+      type: 'alert',
+      title: 'New reply from BidBridge Support',
+      message: text.length > 80 ? `${text.slice(0, 80)}…` : text,
+      href: '/support',
+      isRead: 0,
+      createdAt: now,
+    });
+  } catch (e) { console.error('[support] notification insert failed', e); }
 
   return NextResponse.json({ ok: true });
 }
