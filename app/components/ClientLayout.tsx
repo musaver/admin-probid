@@ -90,23 +90,30 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const isAuthPage = pathname === '/login' || pathname === '/logout';
 
   const [reviewCount, setReviewCount] = useState(0);
+  const [supportCount, setSupportCount] = useState(0);
+  const [verifyCount, setVerifyCount] = useState(0);
   useEffect(() => {
     if (!session || isAuthPage) return;
     let active = true;
     const load = async () => {
       try {
-        const res = await fetch('/api/change-requests?status=pending');
+        // One lightweight endpoint (3 cheap COUNT queries) instead of hitting the heavy
+        // data endpoints just to get numbers.
+        const res = await fetch('/api/badge-counts');
         if (!res.ok) return;
         const data = await res.json();
-        if (active) setReviewCount(Array.isArray(data.requests) ? data.requests.length : 0);
+        if (!active) return;
+        setReviewCount(Number(data.review || 0));
+        setVerifyCount(Number(data.verify || 0));
+        setSupportCount(Number(data.support || 0));
       } catch { /* ignore */ }
     };
     load();
-    const t = setInterval(load, 60000); // refresh the badge every minute
+    const t = setInterval(load, 60000); // refresh the badges every minute
     return () => { active = false; clearInterval(t); };
   }, [session, isAuthPage, pathname]);
 
-  const navBadges = { '/review': reviewCount };
+  const navBadges = { '/review': reviewCount, '/support': supportCount, '/bidder-verification': verifyCount };
 
   if (status === 'loading') return null;
   if (!session || isAuthPage) return <div>{children}</div>;
