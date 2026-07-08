@@ -3,18 +3,19 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
+      // DigitalOcean Spaces (direct + CDN endpoints)
       {
         protocol: 'https',
-        hostname: '*.public.blob.vercel-storage.com',
+        hostname: '*.digitaloceanspaces.com',
         port: '',
         pathname: '/**',
       },
       {
         protocol: 'https',
-        hostname: '*.blob.vercel-storage.com',
+        hostname: '*.cdn.digitaloceanspaces.com',
         port: '',
         pathname: '/**',
-      }
+      },
     ],
   },
 };

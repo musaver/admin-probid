@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put } from '@vercel/blob';
+import { uploadToSpaces, isSpacesConfigured } from '@/lib/spaces';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +13,10 @@ export async function POST(request: NextRequest) {
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+
+    if (!isSpacesConfigured()) {
+      return NextResponse.json({ error: 'File storage (Spaces) is not configured' }, { status: 500 });
     }
 
     // Validate file type
@@ -47,15 +51,16 @@ export async function POST(request: NextRequest) {
     const fileName = `${directory}/${timestamp}-${file.name}`;
     console.log('Generated filename:', fileName);
 
-    // Upload to Vercel Blob
-    console.log('Starting Vercel Blob upload...');
-    const blob = await put(fileName, file, {
-      access: 'public',
+    // Upload to DigitalOcean Spaces
+    console.log('Starting Spaces upload...');
+    const arrayBuffer = await file.arrayBuffer();
+    const uploaded = await uploadToSpaces(fileName, arrayBuffer, {
+      contentType: file.type || undefined,
     });
-    console.log('Upload successful, blob URL:', blob.url);
+    console.log('Upload successful, URL:', uploaded.url);
 
     return NextResponse.json({
-      url: blob.url,
+      url: uploaded.url,
       fileName: fileName
     });
 
