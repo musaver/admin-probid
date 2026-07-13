@@ -117,7 +117,6 @@ export default function BulkUploadModal({
 
   const downloadTemplate = (ext: "xlsx" | "xls" | "csv") => {
     const headers = [
-      "Title",
       "Sale ID",
       "Parcel ID",
       "Address",
@@ -134,8 +133,7 @@ export default function BulkUploadModal({
     ];
     const sampleData = [
       {
-        Title: "Example Property",
-        "Sale ID": "2024-001",
+        "Sale ID": "2025-0001",
         "Parcel ID": "12-34-567",
         Address: "123 Main St",
         City: "Anytown",
@@ -150,8 +148,7 @@ export default function BulkUploadModal({
         Status: "active",
       },
       {
-        Title: "Vacant Lot",
-        "Sale ID": "2024-002",
+        "Sale ID": "2025-0002",
         "Parcel ID": "12-34-568",
         Address: "0 Oak Ave",
         City: "Anytown",
@@ -230,12 +227,10 @@ export default function BulkUploadModal({
             newErrors.push(`Row ${sheetRow}: Status-only mode requires Status.`);
           }
         } else {
-          if (
-            item.Title === undefined ||
-            item.Title === null ||
-            String(item.Title).trim() === ""
-          ) {
-            newErrors.push(`Row ${sheetRow}: Missing required Title.`);
+          // Title is no longer required. A row just needs an identifier: Sale ID
+          // (the key field, NOT NULL in the DB) or at least a Parcel ID to fall back on.
+          if (!sale && !parcel) {
+            newErrors.push(`Row ${sheetRow}: needs a Sale ID (or at least a Parcel ID).`);
           }
         }
       });
@@ -473,7 +468,6 @@ export default function BulkUploadModal({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="whitespace-nowrap">Title</TableHead>
                     <TableHead className="whitespace-nowrap">Sale ID</TableHead>
                     <TableHead className="whitespace-nowrap">Parcel ID</TableHead>
                     <TableHead className="whitespace-nowrap">Address</TableHead>
@@ -493,17 +487,13 @@ export default function BulkUploadModal({
                   {data.slice(0, 50).map((row, i) => (
                     <TableRow key={i}>
                       <TableCell className="whitespace-nowrap">
-                        {!statusOnlyImport &&
-                        (!row.Title || String(row.Title).trim() === "") ? (
+                        {row["Sale ID"] || row["Parcel ID"] ? (
+                          row["Sale ID"] || row["Parcel ID"]
+                        ) : (
                           <span className="text-destructive font-medium">
                             Missing
                           </span>
-                        ) : (
-                          row.Title || "—"
                         )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {row["Sale ID"] || "—"}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {row["Parcel ID"] || "—"}

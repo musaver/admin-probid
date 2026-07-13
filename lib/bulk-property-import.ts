@@ -166,10 +166,14 @@ export function normalizeBulkRow(
     };
   }
 
-  const title = trimStr(p["Title"]);
-  if (!title) {
-    return { ok: false, error: "Missing Title (or use status-only mode with Parcel ID + Sale ID)." };
-  }
+  // Title is no longer required from the user. The `title` column is NOT NULL, so
+  // derive a value: Title if given, else Address (what the app shows as the name),
+  // else Parcel ID, else the Sale ID (guaranteed present above).
+  const title =
+    trimStr(p["Title"]) ||
+    trimStr(p["Address"]) ||
+    parcelId ||
+    saleId;
 
   let ownersArr: string[] = [];
   if (p["Owners"]) {
