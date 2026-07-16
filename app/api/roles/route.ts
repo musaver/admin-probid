@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { adminRoles } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function GET() {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
   try {
     const roles = await db.select().from(adminRoles);
     return NextResponse.json(roles);
@@ -14,6 +17,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
   try {
     const { name, permissions } = await req.json();
 

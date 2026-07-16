@@ -3,21 +3,37 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  const token = await getToken({ 
+  const { pathname } = request.nextUrl;
+
+  const token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET 
+    secret: process.env.NEXTAUTH_SECRET,
   });
 
-  const isAuthPage = request.nextUrl.pathname.startsWith("/login");
+  // API routes: every /api endpoint requires a valid admin session, EXCEPT
+  //  - /api/auth/*        NextAuth's own login/callback routes
+  //  - /api/sync/*        machine-to-machine (guarded by the x-drain-token / inbound secret)
+  // This is the central guard for the admin API (defense-in-depth checks also live in the
+  // sensitive routes themselves). Returns 401 JSON instead of redirecting.
+  if (pathname.startsWith("/api")) {
+    const isOpenApi =
+      pathname.startsWith("/api/auth") || pathname.startsWith("/api/sync");
+    if (!isOpenApi && !token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
+
+  const isAuthPage = pathname.startsWith("/login");
 
   const isProtectedPage =
-    request.nextUrl.pathname === "/" ||
-    request.nextUrl.pathname.startsWith("/properties") ||
-    request.nextUrl.pathname.startsWith("/users") ||
-    request.nextUrl.pathname.startsWith("/messaging") ||
-    request.nextUrl.pathname.startsWith("/admins") ||
-    request.nextUrl.pathname.startsWith("/roles") ||
-    request.nextUrl.pathname.startsWith("/logs");
+    pathname === "/" ||
+    pathname.startsWith("/properties") ||
+    pathname.startsWith("/users") ||
+    pathname.startsWith("/messaging") ||
+    pathname.startsWith("/admins") ||
+    pathname.startsWith("/roles") ||
+    pathname.startsWith("/logs");
 
   if (token && isAuthPage) {
     return NextResponse.redirect(new URL("/", request.url));
@@ -40,5 +56,6 @@ export const config = {
     "/admins/:path*",
     "/roles/:path*",
     "/logs/:path*",
+    "/api/:path*",
   ],
 };

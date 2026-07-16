@@ -4,8 +4,11 @@ import { adminUsers, adminRoles } from '@/lib/schema';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { eq, like, or, and, asc, desc, count } from 'drizzle-orm';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function GET(req: NextRequest) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
   try {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
@@ -71,6 +74,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
   try {
     const { email, password, name, roleId } = await req.json();
 

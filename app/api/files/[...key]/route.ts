@@ -1,11 +1,18 @@
 // GET /api/files/<key...> — streams a private object from DigitalOcean Spaces.
-// Files are stored private (this Space has object ACLs disabled), so they are served
-// back through this proxy. Public read, matching the old Vercel Blob public-URL behavior.
+// Files are stored private; this proxy serves them back. Admins may view any file
+// (reviewing bidder identity documents is part of their job), but the request MUST
+// carry a valid admin session — the /api middleware enforces this, and requireAdmin()
+// re-checks here as defense-in-depth. Responses are marked private so no shared/CDN
+// cache can retain them.
 
 import { NextResponse } from "next/server";
 import { getObjectFromSpaces } from "@/lib/spaces";
+import { requireAdmin } from "@/lib/api-auth";
 
 export async function GET(_req: Request, props: { params: Promise<{ key: string[] }> }) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
+
   const { key } = await props.params;
   const objectKey = (key || []).join("/");
   if (!objectKey) return new NextResponse("Not found", { status: 404 });
@@ -17,7 +24,7 @@ export async function GET(_req: Request, props: { params: Promise<{ key: string[
     status: 200,
     headers: {
       "Content-Type": obj.contentType || "application/octet-stream",
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Cache-Control": "private, no-store",
     },
   });
 }

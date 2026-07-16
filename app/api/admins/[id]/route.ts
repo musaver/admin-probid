@@ -3,11 +3,14 @@ import { db } from '@/lib/db';
 import { adminUsers, adminRoles } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
   try {
     const { id } = await params;
     const [adminData] = await db
@@ -45,6 +48,8 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
   try {
     const { id } = await params;
     const data = await req.json();
@@ -108,6 +113,8 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
   try {
     const { id } = await params;
 
