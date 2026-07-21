@@ -167,7 +167,7 @@ export default function BulkUploadModal({
     const ws = XLSX.utils.json_to_sheet(sampleData, { header: headers });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, `ProBid_Property_Template.${ext}`);
+    XLSX.writeFile(wb, `BidBridge_Property_Template.${ext}`);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
