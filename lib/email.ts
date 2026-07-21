@@ -6,7 +6,7 @@ export async function sendTextEmail(to: string, subject: string, text: string) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      sender: { name: 'Probid Admin', email: 'musaver@lmsyl.shop' },
+      sender: { name: 'BidBridge', email: 'musaver@lmsyl.shop' },
       to: [{ email: to }],
       subject,
       textContent: text,

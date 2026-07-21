@@ -4,8 +4,8 @@ import "./globals.css";
 import ClientLayoutWrapper from "./components/ClientLayoutWrapper"; // NEW wrapper
 
 export const metadata: Metadata = {
-  title: "Admin Panel",
-  description: "Course management admin panel",
+  title: "BidBridge Admin",
+  description: "BidBridge admin panel — manage county auctions, bidders, and properties",
 };
 
 const geistSans = Geist({

@@ -31,7 +31,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight">Probid Admin Dashboard</h1>
+      <h1 className="text-3xl font-bold tracking-tight">BidBridge Admin Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {cards.map((card) => {
@@ -56,11 +56,11 @@ export default function Dashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Welcome to Probid Admin</CardTitle>
+          <CardTitle>Welcome to BidBridge Admin</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            Manage the Probid property bidding platform from this dashboard. You can manage
+            Manage the BidBridge property bidding platform from this dashboard. You can manage
             auction properties, oversee bidder and county accounts, and administer system settings.
           </p>
         </CardContent>
